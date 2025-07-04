@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "bme680_interface.h"
 #include "command_interface.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -98,22 +99,84 @@ int main(void)
   MX_I2C1_Init();
   MX_USART4_UART_Init();
   /* USER CODE BEGIN 2 */
+  // System initialization messages
+  command_interface_send_response("========================================\r\n");
+  command_interface_send_response("IoT Prototype System - STM32G071RB\r\n");
+  command_interface_send_response("========================================\r\n");
+  command_interface_send_response("System Clock: 16 MHz\r\n");
+  command_interface_send_response("I2C1 Configuration: PB8 (SCL), PB9 (SDA)\r\n");
+  command_interface_send_response("USART2: PA2 (TX), PA3 (RX) - 115200 baud\r\n");
+  command_interface_send_response("USART4: PA0 (TX), PA1 (RX) - 115200 baud\r\n");
+  command_interface_send_response("LED Status: PA5\r\n");
+  command_interface_send_response("========================================\r\n");
+  
+  command_interface_send_response_usart4("========================================\r\n");
+  command_interface_send_response_usart4("IoT Prototype System - STM32G071RB\r\n");
+  command_interface_send_response_usart4("========================================\r\n");
+  command_interface_send_response_usart4("System Clock: 16 MHz\r\n");
+  command_interface_send_response_usart4("I2C1 Configuration: PB8 (SCL), PB9 (SDA)\r\n");
+  command_interface_send_response_usart4("USART2: PA2 (TX), PA3 (RX) - 115200 baud\r\n");
+  command_interface_send_response_usart4("USART4: PA0 (TX), PA1 (RX) - 115200 baud\r\n");
+  command_interface_send_response_usart4("LED Status: PA5\r\n");
+  command_interface_send_response_usart4("========================================\r\n");
+  
   // Check BME680 sensor presence
-  command_interface_send_response("Checking BME680 sensor presence...\r\n");
+  command_interface_send_response("\r\nChecking BME680 sensor presence...\r\n");
+  command_interface_send_response_usart4("\r\nChecking BME680 sensor presence...\r\n");
+  
   if (bme680_check_sensor_presence() == BME68X_OK) {
-    command_interface_send_response("BME680 sensor detected on I2C bus\r\n");
+    command_interface_send_response("✓ BME680 sensor detected on I2C bus (Address: 0x76)\r\n");
+    command_interface_send_response_usart4("✓ BME680 sensor detected on I2C bus (Address: 0x76)\r\n");
     
     // Initialize BME680 sensor
     command_interface_send_response("Initializing BME680 sensor...\r\n");
+    command_interface_send_response_usart4("Initializing BME680 sensor...\r\n");
+    
     if (bme680_init_sensor() == BME68X_OK) {
-      command_interface_send_response("BME680 sensor initialized successfully\r\n");
+      command_interface_send_response("✓ BME680 sensor initialized successfully\r\n");
+      command_interface_send_response("  - Temperature oversampling: 1x\r\n");
+      command_interface_send_response("  - Pressure oversampling: 1x\r\n");
+      command_interface_send_response("  - Humidity oversampling: 1x\r\n");
+      command_interface_send_response("  - Gas sensor: Disabled\r\n");
+      
+      command_interface_send_response_usart4("✓ BME680 sensor initialized successfully\r\n");
+      command_interface_send_response_usart4("  - Temperature oversampling: 1x\r\n");
+      command_interface_send_response_usart4("  - Pressure oversampling: 1x\r\n");
+      command_interface_send_response_usart4("  - Humidity oversampling: 1x\r\n");
+      command_interface_send_response_usart4("  - Gas sensor: Disabled\r\n");
     } else {
-      command_interface_send_response("Error initializing BME680 sensor\r\n");
+      command_interface_send_response("✗ Error initializing BME680 sensor\r\n");
+      command_interface_send_response("  - Check sensor power supply (3.3V)\r\n");
+      command_interface_send_response("  - Verify I2C connections\r\n");
+      
+      command_interface_send_response_usart4("✗ Error initializing BME680 sensor\r\n");
+      command_interface_send_response_usart4("  - Check sensor power supply (3.3V)\r\n");
+      command_interface_send_response_usart4("  - Verify I2C connections\r\n");
     }
   } else {
-    command_interface_send_response("BME680 sensor not found on I2C bus\r\n");
-    command_interface_send_response("Please check I2C connections (PB8->SCL, PB9->SDA)\r\n");
+    command_interface_send_response("✗ BME680 sensor not found on I2C bus\r\n");
+    command_interface_send_response("Troubleshooting steps:\r\n");
+    command_interface_send_response("  1. Check I2C connections:\r\n");
+    command_interface_send_response("     - PB8 (SCL) → BME680 SCL\r\n");
+    command_interface_send_response("     - PB9 (SDA) → BME680 SDA\r\n");
+    command_interface_send_response("  2. Verify power supply:\r\n");
+    command_interface_send_response("     - BME680 VCC → 3.3V\r\n");
+    command_interface_send_response("     - BME680 GND → GND\r\n");
+    command_interface_send_response("  3. Check pull-up resistors (4.7kΩ recommended)\r\n");
+    command_interface_send_response("  4. Verify I2C address (default: 0x76)\r\n");
     command_interface_send_response("System will continue without sensor functionality\r\n");
+    
+    command_interface_send_response_usart4("✗ BME680 sensor not found on I2C bus\r\n");
+    command_interface_send_response_usart4("Troubleshooting steps:\r\n");
+    command_interface_send_response_usart4("  1. Check I2C connections:\r\n");
+    command_interface_send_response_usart4("     - PB8 (SCL) → BME680 SCL\r\n");
+    command_interface_send_response_usart4("     - PB9 (SDA) → BME680 SDA\r\n");
+    command_interface_send_response_usart4("  2. Verify power supply:\r\n");
+    command_interface_send_response_usart4("     - BME680 VCC → 3.3V\r\n");
+    command_interface_send_response_usart4("     - BME680 GND → GND\r\n");
+    command_interface_send_response_usart4("  3. Check pull-up resistors (4.7kΩ recommended)\r\n");
+    command_interface_send_response_usart4("  4. Verify I2C address (default: 0x76)\r\n");
+    command_interface_send_response_usart4("System will continue without sensor functionality\r\n");
   }
   
   // Initialize command interface
@@ -327,7 +390,6 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_RESET);
