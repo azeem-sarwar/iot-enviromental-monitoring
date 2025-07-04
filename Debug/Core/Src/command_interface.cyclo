@@ -1,0 +1,10 @@
+../Core/Src/command_interface.c:16:6:command_interface_init	1
+../Core/Src/command_interface.c:28:6:command_interface_process	11
+../Core/Src/command_interface.c:67:6:command_interface_show_help	1
+../Core/Src/command_interface.c:83:6:command_interface_handle_command	12
+../Core/Src/command_interface.c:135:6:command_interface_send_response	1
+../Core/Src/command_interface.c:141:6:cmd_read_temperature	3
+../Core/Src/command_interface.c:163:6:cmd_read_pressure	3
+../Core/Src/command_interface.c:185:6:cmd_read_humidity	3
+../Core/Src/command_interface.c:207:6:cmd_test_sensor	2
+../Core/Src/command_interface.c:219:6:cmd_math_operation	8

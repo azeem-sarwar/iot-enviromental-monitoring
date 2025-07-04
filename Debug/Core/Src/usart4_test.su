@@ -1,0 +1,2 @@
+../Core/Src/usart4_test.c:7:6:USART4_SendString	16	static
+../Core/Src/usart4_test.c:11:6:USART4_Test	40	static

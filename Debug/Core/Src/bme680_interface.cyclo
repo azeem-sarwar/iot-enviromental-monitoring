@@ -1,0 +1,8 @@
+../Core/Src/bme680_interface.c:12:8:bme680_i2c_read	2
+../Core/Src/bme680_interface.c:28:8:bme680_i2c_write	2
+../Core/Src/bme680_interface.c:44:6:bme680_delay_us	3
+../Core/Src/bme680_interface.c:61:8:bme680_init_sensor	3
+../Core/Src/bme680_interface.c:108:8:bme680_read_sensor_data	2
+../Core/Src/bme680_interface.c:129:6:bme680_print_sensor_data	1
+../Core/Src/bme680_interface.c:144:6:bme680_test_sensor	2
+../Core/Src/bme680_interface.c:165:8:bme680_check_sensor_presence	3

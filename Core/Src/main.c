@@ -21,9 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "bme68x.h"
-#include <stdio.h>
-#include <string.h>
+#include "bme680_interface.h"
+#include "command_interface.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -44,27 +43,21 @@
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
 
-SPI_HandleTypeDef hspi1;
-
 UART_HandleTypeDef huart2;
+UART_HandleTypeDef huart4;
 
 /* USER CODE BEGIN PV */
-struct bme68x_dev gas_sensor;
-struct bme68x_data data;
-int8_t bme680_init_success = BME68X_E_NULL_PTR; // Global flag for BME680 status
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
-static void MX_SPI1_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_USART4_UART_Init(void);
 /* USER CODE BEGIN PFP */
-int8_t user_i2c_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, void *intf_ptr);
-int8_t user_i2c_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, void *intf_ptr);
-void user_delay_us(uint32_t period, void *intf_ptr);
-void ReadAndPrintBME680Data(void);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -102,67 +95,30 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
-  MX_SPI1_Init();
   MX_I2C1_Init();
+  MX_USART4_UART_Init();
   /* USER CODE BEGIN 2 */
-  // Small delay to ensure stability
-  HAL_Delay(100);
-
-  // Send startup message and start with LED blinking (indicating initialization)
-  HAL_UART_Transmit(&huart2, (uint8_t*)"Starting BME680 initialization...\r\n", 35, HAL_MAX_DELAY);
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET); // Start with LED OFF
-
-  struct bme68x_conf conf;
-  struct bme68x_heatr_conf heatr_conf;
-  uint8_t dev_addr = BME68X_I2C_ADDR_LOW;
-
-  gas_sensor.intf_ptr = &dev_addr;
-  gas_sensor.intf = BME68X_I2C_INTF;
-  gas_sensor.read = user_i2c_read;
-  gas_sensor.write = user_i2c_write;
-  gas_sensor.delay_us = user_delay_us;
-
-  // Try to initialize BME680
-  bme680_init_success = bme68x_init(&gas_sensor);
-  if (bme680_init_success != BME68X_OK) {
-    HAL_UART_Transmit(&huart2, (uint8_t*)"BME680 init failed!\r\n", 21, HAL_MAX_DELAY);
-    // Don't call Error_Handler, just continue with LED blinking
-  } else {
-    HAL_UART_Transmit(&huart2, (uint8_t*)"BME680 init OK\r\n", 17, HAL_MAX_DELAY);
+  // Check BME680 sensor presence
+  command_interface_send_response("Checking BME680 sensor presence...\r\n");
+  if (bme680_check_sensor_presence() == BME68X_OK) {
+    command_interface_send_response("BME680 sensor detected on I2C bus\r\n");
     
-    // Set oversampling and filter
-    conf.os_hum = BME68X_OS_2X;
-    conf.os_pres = BME68X_OS_4X;
-    conf.os_temp = BME68X_OS_8X;
-    conf.filter = BME68X_FILTER_OFF;
-
-    if (bme68x_set_conf(&conf, &gas_sensor) != BME68X_OK) {
-      HAL_UART_Transmit(&huart2, (uint8_t*)"BME680 config failed!\r\n", 23, HAL_MAX_DELAY);
+    // Initialize BME680 sensor
+    command_interface_send_response("Initializing BME680 sensor...\r\n");
+    if (bme680_init_sensor() == BME68X_OK) {
+      command_interface_send_response("BME680 sensor initialized successfully\r\n");
     } else {
-      HAL_UART_Transmit(&huart2, (uint8_t*)"BME680 config OK\r\n", 19, HAL_MAX_DELAY);
-      
-      // Set heater profile
-      heatr_conf.enable = BME68X_ENABLE;
-      heatr_conf.heatr_temp = 320;  // Temperature in °C
-      heatr_conf.heatr_dur = 150;   // Duration in ms
-
-      if (bme68x_set_heatr_conf(BME68X_FORCED_MODE, &heatr_conf, &gas_sensor) != BME68X_OK) {
-        HAL_UART_Transmit(&huart2, (uint8_t*)"BME680 heater config failed!\r\n", 30, HAL_MAX_DELAY);
-      } else {
-        HAL_UART_Transmit(&huart2, (uint8_t*)"BME680 heater config OK\r\n", 26, HAL_MAX_DELAY);
-      }
+      command_interface_send_response("Error initializing BME680 sensor\r\n");
     }
-  }
-   
-  // Final status message
-  if (bme680_init_success == BME68X_OK) {
-    HAL_UART_Transmit(&huart2, (uint8_t*)"BME680 ready - LED will stay ON\r\n", 32, HAL_MAX_DELAY);
   } else {
-    HAL_UART_Transmit(&huart2, (uint8_t*)"BME680 failed - LED will blink\r\n", 31, HAL_MAX_DELAY);
+    command_interface_send_response("BME680 sensor not found on I2C bus\r\n");
+    command_interface_send_response("Please check I2C connections (PB8->SCL, PB9->SDA)\r\n");
+    command_interface_send_response("System will continue without sensor functionality\r\n");
   }
-
-  HAL_UART_Transmit(&huart2, (uint8_t*)"Entering main loop...\r\n", 23, HAL_MAX_DELAY);
-/* USER CODE END 2 */
+  
+  // Initialize command interface
+  command_interface_init();
+  /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
@@ -170,20 +126,15 @@ int main(void)
   {
     /* USER CODE END WHILE */
 
-    // Only try to read BME680 if initialization was successful
-    if (bme680_init_success == BME68X_OK) {
-      // Everything working - LED stays ON
-      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);
-      ReadAndPrintBME680Data();
-    } else {
-      // Error condition - LED blinks
-      HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
-      HAL_UART_Transmit(&huart2, (uint8_t*)"LED blinking - BME680 not available\r\n", 37, HAL_MAX_DELAY);
-    }
-    
-    HAL_Delay(100); // 2 seconds between readings
-
     /* USER CODE BEGIN 3 */
+    // Process command interface
+    command_interface_process();
+    
+    // Toggle LED to show system is running
+    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+    
+    // Small delay
+    HAL_Delay(10);
   }
   /* USER CODE END 3 */
 }
@@ -277,46 +228,6 @@ static void MX_I2C1_Init(void)
 }
 
 /**
-  * @brief SPI1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_SPI1_Init(void)
-{
-
-  /* USER CODE BEGIN SPI1_Init 0 */
-
-  /* USER CODE END SPI1_Init 0 */
-
-  /* USER CODE BEGIN SPI1_Init 1 */
-
-  /* USER CODE END SPI1_Init 1 */
-  /* SPI1 parameter configuration*/
-  hspi1.Instance = SPI1;
-  hspi1.Init.Mode = SPI_MODE_MASTER;
-  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi1.Init.DataSize = SPI_DATASIZE_4BIT;
-  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi1.Init.NSS = SPI_NSS_HARD_INPUT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
-  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi1.Init.CRCPolynomial = 7;
-  hspi1.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
-  hspi1.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
-  if (HAL_SPI_Init(&hspi1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN SPI1_Init 2 */
-
-  /* USER CODE END SPI1_Init 2 */
-
-}
-
-/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -365,6 +276,42 @@ static void MX_USART2_UART_Init(void)
 }
 
 /**
+  * @brief USART4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART4_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART4_Init 0 */
+
+  /* USER CODE END USART4_Init 0 */
+
+  /* USER CODE BEGIN USART4_Init 1 */
+
+  /* USER CODE END USART4_Init 1 */
+  huart4.Instance = USART4;
+  huart4.Init.BaudRate = 115200;
+  huart4.Init.WordLength = UART_WORDLENGTH_8B;
+  huart4.Init.StopBits = UART_STOPBITS_1;
+  huart4.Init.Parity = UART_PARITY_NONE;
+  huart4.Init.Mode = UART_MODE_TX_RX;
+  huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart4.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart4.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart4.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart4.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART4_Init 2 */
+
+  /* USER CODE END USART4_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -386,7 +333,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : PC0 */
   GPIO_InitStruct.Pin = GPIO_PIN_0;
@@ -395,8 +342,16 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PA0 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  /*Configure GPIO pins : lora_nss_Pin miso_pa6_Pin mosi_pa7_Pin */
+  GPIO_InitStruct.Pin = lora_nss_Pin|miso_pa6_Pin|mosi_pa7_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  GPIO_InitStruct.Alternate = GPIO_AF0_SPI1;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PA5 */
+  GPIO_InitStruct.Pin = GPIO_PIN_5;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -408,50 +363,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-int8_t user_i2c_read(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, void *intf_ptr) {
-    uint8_t dev_id = *(uint8_t*)intf_ptr;
-    HAL_StatusTypeDef status = HAL_I2C_Mem_Read(&hi2c1, dev_id << 1, reg_addr,
-                                                I2C_MEMADD_SIZE_8BIT, reg_data, len, HAL_MAX_DELAY);
-    if (status != HAL_OK) {
-        char debug_msg[64];
-        snprintf(debug_msg, sizeof(debug_msg), "I2C Read failed: %d\r\n", status);
-        HAL_UART_Transmit(&huart2, (uint8_t*)debug_msg, strlen(debug_msg), HAL_MAX_DELAY);
-    }
-    return (status == HAL_OK) ? 0 : -1;
-}
 
-int8_t user_i2c_write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, void *intf_ptr) {
-    uint8_t dev_id = *(uint8_t*)intf_ptr;
-    HAL_StatusTypeDef status = HAL_I2C_Mem_Write(&hi2c1, dev_id << 1, reg_addr,
-                                                 I2C_MEMADD_SIZE_8BIT, (uint8_t *)reg_data, len, HAL_MAX_DELAY);
-    if (status != HAL_OK) {
-        char debug_msg[64];
-        snprintf(debug_msg, sizeof(debug_msg), "I2C Write failed: %d\r\n", status);
-        HAL_UART_Transmit(&huart2, (uint8_t*)debug_msg, strlen(debug_msg), HAL_MAX_DELAY);
-    }
-    return (status == HAL_OK) ? 0 : -1;
-}
-
-void user_delay_us(uint32_t period, void *intf_ptr) {
-    HAL_Delay((period + 999) / 1000); // convert µs to ms
-}
-
-void ReadAndPrintBME680Data(void) {
-    if (bme68x_set_op_mode(BME68X_FORCED_MODE, &gas_sensor) != BME68X_OK)
-        return;
-
-    gas_sensor.delay_us(100000, gas_sensor.intf_ptr);
-
-    uint8_t n_fields;
-    if (bme68x_get_data(BME68X_FORCED_MODE, &data, &n_fields, &gas_sensor) == BME68X_OK && n_fields)
-    {
-        char msg[128];
-        snprintf(msg, sizeof(msg),
-                 "Temp: %.2f °C, Pressure: %.2f hPa, Humidity: %.2f %%\r\n",
-                 data.temperature, data.pressure / 100.0f, data.humidity);
-        HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
-    }
-}
 /* USER CODE END 4 */
 
 /**

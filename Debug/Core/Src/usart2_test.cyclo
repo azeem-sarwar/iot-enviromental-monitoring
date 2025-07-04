@@ -1,0 +1,2 @@
+../Core/Src/usart2_test.c:7:6:USART2_SendString	1
+../Core/Src/usart2_test.c:11:6:USART2_Test	2
