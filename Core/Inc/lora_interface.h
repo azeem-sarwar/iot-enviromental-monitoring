@@ -31,6 +31,10 @@ int8_t lora_get_status(void);
 void lora_print_config(void);
 int8_t lora_test_transmission(void);
 
-
+// New scanning and monitoring functions
+int8_t lora_scan_signals(uint32_t scan_time_ms);
+int8_t lora_start_monitoring(void);
+int8_t lora_stop_monitoring(void);
+int8_t lora_get_rssi(void);
 
 #endif // __LORA_INTERFACE_H__ 

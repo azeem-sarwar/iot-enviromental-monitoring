@@ -102,12 +102,12 @@ sx126x_hal_status_t sx126x_hal_write(const void* context, const uint8_t* command
     
     sx126x_hal_spi_select();
     
-    // Send command
-    HAL_StatusTypeDef status = HAL_SPI_Transmit(hal_ctx.spi, (uint8_t*)command, command_length, 1000);
+    // Send command with shorter timeout
+    HAL_StatusTypeDef status = HAL_SPI_Transmit(hal_ctx.spi, (uint8_t*)command, command_length, 100);
     
     // Send data if present
     if ((status == HAL_OK) && (data != NULL) && (data_length > 0)) {
-        status = HAL_SPI_Transmit(hal_ctx.spi, (uint8_t*)data, data_length, 1000);
+        status = HAL_SPI_Transmit(hal_ctx.spi, (uint8_t*)data, data_length, 100);
     }
     
     sx126x_hal_spi_deselect();
@@ -122,12 +122,12 @@ sx126x_hal_status_t sx126x_hal_read(const void* context, const uint8_t* command,
     
     sx126x_hal_spi_select();
     
-    // Send command
-    HAL_StatusTypeDef status = HAL_SPI_Transmit(hal_ctx.spi, (uint8_t*)command, command_length, 1000);
+    // Send command with shorter timeout
+    HAL_StatusTypeDef status = HAL_SPI_Transmit(hal_ctx.spi, (uint8_t*)command, command_length, 100);
     
     // Receive data if present
     if ((status == HAL_OK) && (data != NULL) && (data_length > 0)) {
-        status = HAL_SPI_Receive(hal_ctx.spi, data, data_length, 1000);
+        status = HAL_SPI_Receive(hal_ctx.spi, data, data_length, 100);
     }
     
     sx126x_hal_spi_deselect();

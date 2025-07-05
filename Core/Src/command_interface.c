@@ -122,9 +122,14 @@ void command_interface_show_help(void)
     command_interface_send_response("  raw adc (ra)          - Read raw BME680 ADC values\r\n");
     command_interface_send_response("  calib data (cd)       - Check BME680 calibration data\r\n");
     command_interface_send_response("  scan i2c (si)         - Scan I2C bus for devices\r\n");
+    command_interface_send_response("\r\nLoRa Commands:\r\n");
     command_interface_send_response("  lora broadcast (lb)   - Broadcast sensor data via LoRa\r\n");
     command_interface_send_response("  lora config (lc)      - Show LoRa configuration\r\n");
     command_interface_send_response("  lora test (lt)        - Test LoRa transmission\r\n");
+    command_interface_send_response("  lora scan (ls)        - Scan for LoRa signals (5s)\r\n");
+    command_interface_send_response("  lora monitor (lm)     - Start continuous monitoring\r\n");
+    command_interface_send_response("  lora stop (lst)       - Stop LoRa monitoring\r\n");
+    command_interface_send_response("  lora rssi (lr)        - Get current RSSI\r\n");
     command_interface_send_response("\r\nMath Operations:\r\n");
     command_interface_send_response("  sum <num1> <num2>     - Add two numbers\r\n");
     command_interface_send_response("  sub <num1> <num2>     - Subtract num2 from num1\r\n");
@@ -186,6 +191,18 @@ void command_interface_handle_command(char* command)
     }
     else if (strcmp(command, "lora test") == 0 || strcmp(command, "lt") == 0) {
         lora_test_transmission();
+    }
+    else if (strcmp(command, "lora scan") == 0 || strcmp(command, "ls") == 0) {
+        lora_scan_signals(5000); // 5 second scan
+    }
+    else if (strcmp(command, "lora monitor") == 0 || strcmp(command, "lm") == 0) {
+        lora_start_monitoring();
+    }
+    else if (strcmp(command, "lora stop") == 0 || strcmp(command, "lst") == 0) {
+        lora_stop_monitoring();
+    }
+    else if (strcmp(command, "lora rssi") == 0 || strcmp(command, "lr") == 0) {
+        lora_get_rssi();
     }
     else if (strncmp(command, "sum ", 4) == 0) {
         cmd_math_operation(command);
@@ -515,6 +532,18 @@ void command_interface_handle_command_usart4(char* command)
     }
     else if (strcmp(command, "lora test") == 0 || strcmp(command, "lt") == 0) {
         lora_test_transmission();
+    }
+    else if (strcmp(command, "lora scan") == 0 || strcmp(command, "ls") == 0) {
+        lora_scan_signals(5000); // 5 second scan
+    }
+    else if (strcmp(command, "lora monitor") == 0 || strcmp(command, "lm") == 0) {
+        lora_start_monitoring();
+    }
+    else if (strcmp(command, "lora stop") == 0 || strcmp(command, "lst") == 0) {
+        lora_stop_monitoring();
+    }
+    else if (strcmp(command, "lora rssi") == 0 || strcmp(command, "lr") == 0) {
+        lora_get_rssi();
     }
     else if (strncmp(command, "sum ", 4) == 0) {
         cmd_math_operation_usart4(command);
