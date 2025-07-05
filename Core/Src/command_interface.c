@@ -1,5 +1,6 @@
 #include "command_interface.h"
 #include "bme680_interface.h"
+#include "lora_interface.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -121,6 +122,9 @@ void command_interface_show_help(void)
     command_interface_send_response("  raw adc (ra)          - Read raw BME680 ADC values\r\n");
     command_interface_send_response("  calib data (cd)       - Check BME680 calibration data\r\n");
     command_interface_send_response("  scan i2c (si)         - Scan I2C bus for devices\r\n");
+    command_interface_send_response("  lora broadcast (lb)   - Broadcast sensor data via LoRa\r\n");
+    command_interface_send_response("  lora config (lc)      - Show LoRa configuration\r\n");
+    command_interface_send_response("  lora test (lt)        - Test LoRa transmission\r\n");
     command_interface_send_response("\r\nMath Operations:\r\n");
     command_interface_send_response("  sum <num1> <num2>     - Add two numbers\r\n");
     command_interface_send_response("  sub <num1> <num2>     - Subtract num2 from num1\r\n");
@@ -173,6 +177,15 @@ void command_interface_handle_command(char* command)
     }
     else if (strcmp(command, "scan i2c") == 0 || strcmp(command, "si") == 0) {
         i2c_scan_bus();
+    }
+    else if (strcmp(command, "lora broadcast") == 0 || strcmp(command, "lb") == 0) {
+        cmd_lora_broadcast();
+    }
+    else if (strcmp(command, "lora config") == 0 || strcmp(command, "lc") == 0) {
+        lora_print_config();
+    }
+    else if (strcmp(command, "lora test") == 0 || strcmp(command, "lt") == 0) {
+        lora_test_transmission();
     }
     else if (strncmp(command, "sum ", 4) == 0) {
         cmd_math_operation(command);
@@ -438,6 +451,9 @@ void command_interface_show_help_usart4(void)
     command_interface_send_response_usart4("  raw adc (ra)          - Read raw BME680 ADC values\r\n");
     command_interface_send_response_usart4("  calib data (cd)       - Check BME680 calibration data\r\n");
     command_interface_send_response_usart4("  scan i2c (si)         - Scan I2C bus for devices\r\n");
+    command_interface_send_response_usart4("  lora broadcast (lb)   - Broadcast sensor data via LoRa\r\n");
+    command_interface_send_response_usart4("  lora config (lc)      - Show LoRa configuration\r\n");
+    command_interface_send_response_usart4("  lora test (lt)        - Test LoRa transmission\r\n");
     command_interface_send_response_usart4("\r\nMath Operations:\r\n");
     command_interface_send_response_usart4("  sum <num1> <num2>     - Add two numbers\r\n");
     command_interface_send_response_usart4("  sub <num1> <num2>     - Subtract num2 from num1\r\n");
@@ -490,6 +506,15 @@ void command_interface_handle_command_usart4(char* command)
     }
     else if (strcmp(command, "scan i2c") == 0 || strcmp(command, "si") == 0) {
         i2c_scan_bus();
+    }
+    else if (strcmp(command, "lora broadcast") == 0 || strcmp(command, "lb") == 0) {
+        cmd_lora_broadcast_usart4();
+    }
+    else if (strcmp(command, "lora config") == 0 || strcmp(command, "lc") == 0) {
+        lora_print_config();
+    }
+    else if (strcmp(command, "lora test") == 0 || strcmp(command, "lt") == 0) {
+        lora_test_transmission();
     }
     else if (strncmp(command, "sum ", 4) == 0) {
         cmd_math_operation_usart4(command);
@@ -649,4 +674,68 @@ void cmd_math_operation_usart4(char* command)
     }
     
     command_interface_send_response_usart4(response);
+}
+
+// Command handler for LoRa broadcast (USART2)
+void cmd_lora_broadcast(void)
+{
+    struct bme68x_data sensor_data;
+    char response[128];
+    
+    // Check if sensor is available
+    if (bme680_check_sensor_presence() != BME68X_OK) {
+        snprintf(response, sizeof(response), "Error: BME680 sensor not available\r\n");
+        command_interface_send_response(response);
+        return;
+    }
+    
+    // Read sensor data
+    if (bme680_read_sensor_data(&sensor_data) == BME68X_OK) {
+        snprintf(response, sizeof(response), 
+                 "Broadcasting sensor data via LoRa...\r\nTemperature: %.2f°C, Pressure: %.2f Pa, Humidity: %.2f%%\r\n",
+                 sensor_data.temperature, sensor_data.pressure, sensor_data.humidity);
+        command_interface_send_response(response);
+        
+        // Send via LoRa
+        if (lora_send_sensor_data(sensor_data.temperature, sensor_data.pressure, sensor_data.humidity) == 0) {
+            command_interface_send_response("✓ LoRa broadcast successful\r\n");
+        } else {
+            command_interface_send_response("✗ LoRa broadcast failed\r\n");
+        }
+    } else {
+        snprintf(response, sizeof(response), "Error reading sensor data for LoRa broadcast\r\n");
+        command_interface_send_response(response);
+    }
+}
+
+// Command handler for LoRa broadcast (USART4)
+void cmd_lora_broadcast_usart4(void)
+{
+    struct bme68x_data sensor_data;
+    char response[128];
+    
+    // Check if sensor is available
+    if (bme680_check_sensor_presence() != BME68X_OK) {
+        snprintf(response, sizeof(response), "Error: BME680 sensor not available\r\n");
+        command_interface_send_response_usart4(response);
+        return;
+    }
+    
+    // Read sensor data
+    if (bme680_read_sensor_data(&sensor_data) == BME68X_OK) {
+        snprintf(response, sizeof(response), 
+                 "Broadcasting sensor data via LoRa...\r\nTemperature: %.2f°C, Pressure: %.2f Pa, Humidity: %.2f%%\r\n",
+                 sensor_data.temperature, sensor_data.pressure, sensor_data.humidity);
+        command_interface_send_response_usart4(response);
+        
+        // Send via LoRa
+        if (lora_send_sensor_data(sensor_data.temperature, sensor_data.pressure, sensor_data.humidity) == 0) {
+            command_interface_send_response_usart4("✓ LoRa broadcast successful\r\n");
+        } else {
+            command_interface_send_response_usart4("✗ LoRa broadcast failed\r\n");
+        }
+    } else {
+        snprintf(response, sizeof(response), "Error reading sensor data for LoRa broadcast\r\n");
+        command_interface_send_response_usart4(response);
+    }
 }

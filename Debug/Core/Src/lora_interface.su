@@ -1,0 +1,9 @@
+../Core/Src/lora_interface.c:42:13:lora_debug_print	16	static
+../Core/Src/lora_interface.c:48:15:lora_detect_module	24	static
+../Core/Src/lora_interface.c:103:8:lora_init	32	static
+../Core/Src/lora_interface.c:207:8:lora_send_sensor_data	144	static
+../Core/Src/lora_interface.c:235:8:lora_send_message	184	static
+../Core/Src/lora_interface.c:309:6:lora_process_irq	24	static
+../Core/Src/lora_interface.c:328:8:lora_get_status	24	static
+../Core/Src/lora_interface.c:373:6:lora_print_config	8	static
+../Core/Src/lora_interface.c:399:8:lora_test_transmission	24	static

@@ -31,4 +31,8 @@ void cmd_test_sensor_usart4(void);
 void cmd_math_operation_usart4(char* command);
 void command_interface_show_help_usart4(void);
 
+// LoRa Command handlers
+void cmd_lora_broadcast(void);
+void cmd_lora_broadcast_usart4(void);
+
 #endif // __COMMAND_INTERFACE_H__ 

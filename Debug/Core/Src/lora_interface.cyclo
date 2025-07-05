@@ -1,0 +1,9 @@
+../Core/Src/lora_interface.c:42:13:lora_debug_print	1
+../Core/Src/lora_interface.c:48:15:lora_detect_module	8
+../Core/Src/lora_interface.c:103:8:lora_init	12
+../Core/Src/lora_interface.c:207:8:lora_send_sensor_data	5
+../Core/Src/lora_interface.c:235:8:lora_send_message	14
+../Core/Src/lora_interface.c:309:6:lora_process_irq	6
+../Core/Src/lora_interface.c:328:8:lora_get_status	10
+../Core/Src/lora_interface.c:373:6:lora_print_config	3
+../Core/Src/lora_interface.c:399:8:lora_test_transmission	4
