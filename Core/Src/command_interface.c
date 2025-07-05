@@ -112,18 +112,22 @@ void command_interface_process(void)
 void command_interface_show_help(void)
 {
     command_interface_send_response("\r\n=== Available Commands ===\r\n");
-    command_interface_send_response("read temperature - Read temperature from BME680\r\n");
-    command_interface_send_response("read pressure   - Read pressure from BME680\r\n");
-    command_interface_send_response("read humidity   - Read humidity from BME680\r\n");
-    command_interface_send_response("test sensor     - Test BME680 sensor\r\n");
-    command_interface_send_response("raw registers   - Read raw BME680 registers\r\n");
-    command_interface_send_response("calib data      - Check BME680 calibration data\r\n");
-    command_interface_send_response("scan i2c        - Scan I2C bus for devices\r\n");
-    command_interface_send_response("sum <num1> <num2> - Add two numbers\r\n");
-    command_interface_send_response("sub <num1> <num2> - Subtract num2 from num1\r\n");
-    command_interface_send_response("mul <num1> <num2> - Multiply two numbers\r\n");
-    command_interface_send_response("div <num1> <num2> - Divide num1 by num2\r\n");
-    command_interface_send_response("help            - Show this help menu\r\n");
+    command_interface_send_response("Sensor Commands:\r\n");
+    command_interface_send_response("  read temperature (rt) - Read temperature from BME680\r\n");
+    command_interface_send_response("  read pressure (rp)    - Read pressure from BME680\r\n");
+    command_interface_send_response("  read humidity (rh)    - Read humidity from BME680\r\n");
+    command_interface_send_response("  test sensor (ts)      - Test BME680 sensor\r\n");
+    command_interface_send_response("  raw registers (rr)    - Read raw BME680 registers\r\n");
+    command_interface_send_response("  raw adc (ra)          - Read raw BME680 ADC values\r\n");
+    command_interface_send_response("  calib data (cd)       - Check BME680 calibration data\r\n");
+    command_interface_send_response("  scan i2c (si)         - Scan I2C bus for devices\r\n");
+    command_interface_send_response("\r\nMath Operations:\r\n");
+    command_interface_send_response("  sum <num1> <num2>     - Add two numbers\r\n");
+    command_interface_send_response("  sub <num1> <num2>     - Subtract num2 from num1\r\n");
+    command_interface_send_response("  mul <num1> <num2>     - Multiply two numbers\r\n");
+    command_interface_send_response("  div <num1> <num2>     - Divide num1 by num2\r\n");
+    command_interface_send_response("\r\nSystem:\r\n");
+    command_interface_send_response("  help                  - Show this help menu\r\n");
     command_interface_send_response("========================\r\n");
 }
 
@@ -145,26 +149,29 @@ void command_interface_handle_command(char* command)
         }
     }
     
-    // Parse commands
-    if (strcmp(command, "read temperature") == 0) {
+    // Parse commands (full and abbreviated versions)
+    if (strcmp(command, "read temperature") == 0 || strcmp(command, "rt") == 0) {
         cmd_read_temperature();
     }
-    else if (strcmp(command, "read pressure") == 0) {
+    else if (strcmp(command, "read pressure") == 0 || strcmp(command, "rp") == 0) {
         cmd_read_pressure();
     }
-    else if (strcmp(command, "read humidity") == 0) {
+    else if (strcmp(command, "read humidity") == 0 || strcmp(command, "rh") == 0) {
         cmd_read_humidity();
     }
-    else if (strcmp(command, "test sensor") == 0) {
+    else if (strcmp(command, "test sensor") == 0 || strcmp(command, "ts") == 0) {
         cmd_test_sensor();
     }
-    else if (strcmp(command, "raw registers") == 0) {
+    else if (strcmp(command, "raw registers") == 0 || strcmp(command, "rr") == 0) {
         bme680_read_raw_registers();
     }
-    else if (strcmp(command, "calib data") == 0) {
+    else if (strcmp(command, "raw adc") == 0 || strcmp(command, "ra") == 0) {
+        bme680_read_raw_adc_values();
+    }
+    else if (strcmp(command, "calib data") == 0 || strcmp(command, "cd") == 0) {
         bme680_check_calibration_data();
     }
-    else if (strcmp(command, "scan i2c") == 0) {
+    else if (strcmp(command, "scan i2c") == 0 || strcmp(command, "si") == 0) {
         i2c_scan_bus();
     }
     else if (strncmp(command, "sum ", 4) == 0) {
@@ -278,7 +285,34 @@ void cmd_read_pressure(void)
     }
     
     if (bme680_read_sensor_data(&sensor_data) == BME68X_OK) {
-        snprintf(response, sizeof(response), "Pressure: %.2f Pa\r\n", sensor_data.pressure);
+        // Decode the IEEE 754 value from memory
+        uint32_t press_mem = *(uint32_t*)&sensor_data.pressure;
+        uint32_t press_sign = (press_mem >> 31) & 0x1;
+        uint32_t press_exp = (press_mem >> 23) & 0xFF;
+        uint32_t press_mant = press_mem & 0x7FFFFF;
+        
+        float press_decoded = 0.0f;
+        if (press_exp != 0 && press_exp != 0xFF) {
+            int press_exp_val = (int)press_exp - 127;
+            float press_result = 1.0f;
+            
+            for (int i = 22; i >= 0; i--) {
+                if (press_mant & (1 << i)) {
+                    press_result += 1.0f / (1 << (23 - i));
+                }
+            }
+            
+            if (press_exp_val > 0) {
+                press_result *= (1 << press_exp_val);
+            } else if (press_exp_val < 0) {
+                press_result /= (1 << (-press_exp_val));
+            }
+            
+            if (press_sign) press_result = -press_result;
+            press_decoded = press_result;
+        }
+        
+        snprintf(response, sizeof(response), "Pressure: %.2f Pa\r\n", press_decoded);
     } else {
         snprintf(response, sizeof(response), "Error reading pressure from BME680\r\n");
     }
@@ -300,7 +334,34 @@ void cmd_read_humidity(void)
     }
     
     if (bme680_read_sensor_data(&sensor_data) == BME68X_OK) {
-        snprintf(response, sizeof(response), "Humidity: %.2f%%\r\n", sensor_data.humidity);
+        // Decode the IEEE 754 value from memory
+        uint32_t hum_mem = *(uint32_t*)&sensor_data.humidity;
+        uint32_t hum_sign = (hum_mem >> 31) & 0x1;
+        uint32_t hum_exp = (hum_mem >> 23) & 0xFF;
+        uint32_t hum_mant = hum_mem & 0x7FFFFF;
+        
+        float hum_decoded = 0.0f;
+        if (hum_exp != 0 && hum_exp != 0xFF) {
+            int hum_exp_val = (int)hum_exp - 127;
+            float hum_result = 1.0f;
+            
+            for (int i = 22; i >= 0; i--) {
+                if (hum_mant & (1 << i)) {
+                    hum_result += 1.0f / (1 << (23 - i));
+                }
+            }
+            
+            if (hum_exp_val > 0) {
+                hum_result *= (1 << hum_exp_val);
+            } else if (hum_exp_val < 0) {
+                hum_result /= (1 << (-hum_exp_val));
+            }
+            
+            if (hum_sign) hum_result = -hum_result;
+            hum_decoded = hum_result;
+        }
+        
+        snprintf(response, sizeof(response), "Humidity: %.2f%%\r\n", hum_decoded);
     } else {
         snprintf(response, sizeof(response), "Error reading humidity from BME680\r\n");
     }
@@ -368,18 +429,22 @@ void cmd_math_operation(char* command)
 void command_interface_show_help_usart4(void)
 {
     command_interface_send_response_usart4("\r\n=== Available Commands (USART4) ===\r\n");
-    command_interface_send_response_usart4("read temperature - Read temperature from BME680\r\n");
-    command_interface_send_response_usart4("read pressure   - Read pressure from BME680\r\n");
-    command_interface_send_response_usart4("read humidity   - Read humidity from BME680\r\n");
-    command_interface_send_response_usart4("test sensor     - Test BME680 sensor\r\n");
-    command_interface_send_response_usart4("raw registers   - Read raw BME680 registers\r\n");
-    command_interface_send_response_usart4("calib data      - Check BME680 calibration data\r\n");
-    command_interface_send_response_usart4("scan i2c        - Scan I2C bus for devices\r\n");
-    command_interface_send_response_usart4("sum <num1> <num2> - Add two numbers\r\n");
-    command_interface_send_response_usart4("sub <num1> <num2> - Subtract num2 from num1\r\n");
-    command_interface_send_response_usart4("mul <num1> <num2> - Multiply two numbers\r\n");
-    command_interface_send_response_usart4("div <num1> <num2> - Divide num1 by num2\r\n");
-    command_interface_send_response_usart4("help            - Show this help menu\r\n");
+    command_interface_send_response_usart4("Sensor Commands:\r\n");
+    command_interface_send_response_usart4("  read temperature (rt) - Read temperature from BME680\r\n");
+    command_interface_send_response_usart4("  read pressure (rp)    - Read pressure from BME680\r\n");
+    command_interface_send_response_usart4("  read humidity (rh)    - Read humidity from BME680\r\n");
+    command_interface_send_response_usart4("  test sensor (ts)      - Test BME680 sensor\r\n");
+    command_interface_send_response_usart4("  raw registers (rr)    - Read raw BME680 registers\r\n");
+    command_interface_send_response_usart4("  raw adc (ra)          - Read raw BME680 ADC values\r\n");
+    command_interface_send_response_usart4("  calib data (cd)       - Check BME680 calibration data\r\n");
+    command_interface_send_response_usart4("  scan i2c (si)         - Scan I2C bus for devices\r\n");
+    command_interface_send_response_usart4("\r\nMath Operations:\r\n");
+    command_interface_send_response_usart4("  sum <num1> <num2>     - Add two numbers\r\n");
+    command_interface_send_response_usart4("  sub <num1> <num2>     - Subtract num2 from num1\r\n");
+    command_interface_send_response_usart4("  mul <num1> <num2>     - Multiply two numbers\r\n");
+    command_interface_send_response_usart4("  div <num1> <num2>     - Divide num1 by num2\r\n");
+    command_interface_send_response_usart4("\r\nSystem:\r\n");
+    command_interface_send_response_usart4("  help                  - Show this help menu\r\n");
     command_interface_send_response_usart4("========================\r\n");
 }
 
@@ -401,26 +466,29 @@ void command_interface_handle_command_usart4(char* command)
         }
     }
     
-    // Parse commands
-    if (strcmp(command, "read temperature") == 0) {
+    // Parse commands (full and abbreviated versions)
+    if (strcmp(command, "read temperature") == 0 || strcmp(command, "rt") == 0) {
         cmd_read_temperature_usart4();
     }
-    else if (strcmp(command, "read pressure") == 0) {
+    else if (strcmp(command, "read pressure") == 0 || strcmp(command, "rp") == 0) {
         cmd_read_pressure_usart4();
     }
-    else if (strcmp(command, "read humidity") == 0) {
+    else if (strcmp(command, "read humidity") == 0 || strcmp(command, "rh") == 0) {
         cmd_read_humidity_usart4();
     }
-    else if (strcmp(command, "test sensor") == 0) {
+    else if (strcmp(command, "test sensor") == 0 || strcmp(command, "ts") == 0) {
         cmd_test_sensor_usart4();
     }
-    else if (strcmp(command, "raw registers") == 0) {
+    else if (strcmp(command, "raw registers") == 0 || strcmp(command, "rr") == 0) {
         bme680_read_raw_registers();
     }
-    else if (strcmp(command, "calib data") == 0) {
+    else if (strcmp(command, "raw adc") == 0 || strcmp(command, "ra") == 0) {
+        bme680_read_raw_adc_values();
+    }
+    else if (strcmp(command, "calib data") == 0 || strcmp(command, "cd") == 0) {
         bme680_check_calibration_data();
     }
-    else if (strcmp(command, "scan i2c") == 0) {
+    else if (strcmp(command, "scan i2c") == 0 || strcmp(command, "si") == 0) {
         i2c_scan_bus();
     }
     else if (strncmp(command, "sum ", 4) == 0) {

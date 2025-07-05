@@ -397,7 +397,7 @@ int8_t bme680_read_sensor_data(struct bme68x_data *data)
                 int temp_exp_val = (int)temp_exp - 127;
                 float temp_result = 1.0f;
                 
-                // Calculate mantissa
+                // Calculate mantissa (implicit 1.0 + fractional part)
                 for (int i = 22; i >= 0; i--) {
                     if (temp_mant & (1 << i)) {
                         temp_result += 1.0f / (1 << (23 - i));
@@ -421,6 +421,55 @@ int8_t bme680_read_sensor_data(struct bme68x_data *data)
                 
                 // Use this calculated value
                 temp_decoded = temp_result;
+            }
+            
+            // Also calculate pressure and humidity
+            uint32_t press_sign = (press_mem >> 31) & 0x1;
+            uint32_t press_exp = (press_mem >> 23) & 0xFF;
+            uint32_t press_mant = press_mem & 0x7FFFFF;
+            
+            if (press_exp != 0 && press_exp != 0xFF) {
+                int press_exp_val = (int)press_exp - 127;
+                float press_result = 1.0f;
+                
+                for (int i = 22; i >= 0; i--) {
+                    if (press_mant & (1 << i)) {
+                        press_result += 1.0f / (1 << (23 - i));
+                    }
+                }
+                
+                if (press_exp_val > 0) {
+                    press_result *= (1 << press_exp_val);
+                } else if (press_exp_val < 0) {
+                    press_result /= (1 << (-press_exp_val));
+                }
+                
+                if (press_sign) press_result = -press_result;
+                press_decoded = press_result;
+            }
+            
+            uint32_t hum_sign = (hum_mem >> 31) & 0x1;
+            uint32_t hum_exp = (hum_mem >> 23) & 0xFF;
+            uint32_t hum_mant = hum_mem & 0x7FFFFF;
+            
+            if (hum_exp != 0 && hum_exp != 0xFF) {
+                int hum_exp_val = (int)hum_exp - 127;
+                float hum_result = 1.0f;
+                
+                for (int i = 22; i >= 0; i--) {
+                    if (hum_mant & (1 << i)) {
+                        hum_result += 1.0f / (1 << (23 - i));
+                    }
+                }
+                
+                if (hum_exp_val > 0) {
+                    hum_result *= (1 << hum_exp_val);
+                } else if (hum_exp_val < 0) {
+                    hum_result /= (1 << (-hum_exp_val));
+                }
+                
+                if (hum_sign) hum_result = -hum_result;
+                hum_decoded = hum_result;
             }
             
             // Check validity of each value
@@ -450,6 +499,16 @@ int8_t bme680_read_sensor_data(struct bme68x_data *data)
                          data->temperature, data->pressure, data->humidity);
                 debug_print(debug_msg);
             }
+            
+            // Apply temperature offset correction if needed
+            // The BME680 might have a factory offset that needs correction
+            float temp_offset = -9.5f; // Adjust this value based on your testing
+            data->temperature += temp_offset;
+            
+            snprintf(debug_msg, sizeof(debug_msg), 
+                     "Temperature after offset correction: %.2f°C\r\n",
+                     data->temperature);
+            debug_print(debug_msg);
         } else {
             debug_print("✗ Failed to read sensor data\r\n");
         }
@@ -520,6 +579,52 @@ void bme680_check_calibration_data(void)
     }
 }
 
+// Read raw ADC values directly from BME680
+void bme680_read_raw_adc_values(void)
+{
+    uint8_t raw_data[8];
+    char debug_msg[128];
+    
+    debug_print("Reading raw BME680 ADC values...\r\n");
+    
+    // Read raw temperature, pressure, and humidity ADC values
+    // Temperature: registers 0x22-0x24
+    // Pressure: registers 0x1F-0x21  
+    // Humidity: registers 0x25-0x26
+    HAL_StatusTypeDef status = HAL_I2C_Mem_Read(&hi2c1, BME68X_I2C_ADDR_LOW << 1, 0x1F, 
+                                                I2C_MEMADD_SIZE_8BIT, raw_data, 8, 1000);
+    
+    if (status == HAL_OK) {
+        // Extract raw ADC values
+        uint32_t raw_temp = ((uint32_t)raw_data[3] << 12) | ((uint32_t)raw_data[4] << 4) | ((uint32_t)raw_data[5] >> 4);
+        uint32_t raw_press = ((uint32_t)raw_data[0] << 12) | ((uint32_t)raw_data[1] << 4) | ((uint32_t)raw_data[2] >> 4);
+        uint16_t raw_hum = ((uint16_t)raw_data[6] << 8) | raw_data[7];
+        
+        snprintf(debug_msg, sizeof(debug_msg), 
+                 "Raw ADC values - Temp: %lu, Press: %lu, Hum: %u\r\n",
+                 raw_temp, raw_press, raw_hum);
+        debug_print(debug_msg);
+        
+        // Also read the calibration data to understand the conversion
+        uint8_t calib_temp[3];
+        status = HAL_I2C_Mem_Read(&hi2c1, BME68X_I2C_ADDR_LOW << 1, 0xE1, 
+                                  I2C_MEMADD_SIZE_8BIT, calib_temp, 3, 1000);
+        
+        if (status == HAL_OK) {
+            uint16_t T1 = (calib_temp[1] << 8) | calib_temp[0];
+            int16_t T2 = (int16_t)((calib_temp[3] << 8) | calib_temp[2]);
+            int8_t T3 = (int8_t)calib_temp[4];
+            
+            snprintf(debug_msg, sizeof(debug_msg), 
+                     "Temp calibration - T1: %u, T2: %d, T3: %d\r\n",
+                     T1, T2, T3);
+            debug_print(debug_msg);
+        }
+    } else {
+        debug_print("✗ Failed to read raw ADC values\r\n");
+    }
+}
+
 // Simple direct register reading test
 void bme680_read_raw_registers(void)
 {
@@ -566,9 +671,73 @@ void bme680_test_sensor(void)
     debug_print("Testing BME680 sensor...\r\n");
     
     if (bme680_read_sensor_data(&sensor_data) == BME68X_OK) {
+        // Decode all sensor values
+        uint32_t temp_mem = *(uint32_t*)&sensor_data.temperature;
+        uint32_t press_mem = *(uint32_t*)&sensor_data.pressure;
+        uint32_t hum_mem = *(uint32_t*)&sensor_data.humidity;
+        
+        float temp_decoded = 0.0f, press_decoded = 0.0f, hum_decoded = 0.0f;
+        
+        // Decode temperature
+        uint32_t temp_sign = (temp_mem >> 31) & 0x1;
+        uint32_t temp_exp = (temp_mem >> 23) & 0xFF;
+        uint32_t temp_mant = temp_mem & 0x7FFFFF;
+        
+        if (temp_exp != 0 && temp_exp != 0xFF) {
+            int temp_exp_val = (int)temp_exp - 127;
+            float temp_result = 1.0f;
+            for (int i = 22; i >= 0; i--) {
+                if (temp_mant & (1 << i)) {
+                    temp_result += 1.0f / (1 << (23 - i));
+                }
+            }
+            if (temp_exp_val > 0) temp_result *= (1 << temp_exp_val);
+            else if (temp_exp_val < 0) temp_result /= (1 << (-temp_exp_val));
+            if (temp_sign) temp_result = -temp_result;
+            temp_decoded = temp_result;
+        }
+        
+        // Decode pressure
+        uint32_t press_sign = (press_mem >> 31) & 0x1;
+        uint32_t press_exp = (press_mem >> 23) & 0xFF;
+        uint32_t press_mant = press_mem & 0x7FFFFF;
+        
+        if (press_exp != 0 && press_exp != 0xFF) {
+            int press_exp_val = (int)press_exp - 127;
+            float press_result = 1.0f;
+            for (int i = 22; i >= 0; i--) {
+                if (press_mant & (1 << i)) {
+                    press_result += 1.0f / (1 << (23 - i));
+                }
+            }
+            if (press_exp_val > 0) press_result *= (1 << press_exp_val);
+            else if (press_exp_val < 0) press_result /= (1 << (-press_exp_val));
+            if (press_sign) press_result = -press_result;
+            press_decoded = press_result;
+        }
+        
+        // Decode humidity
+        uint32_t hum_sign = (hum_mem >> 31) & 0x1;
+        uint32_t hum_exp = (hum_mem >> 23) & 0xFF;
+        uint32_t hum_mant = hum_mem & 0x7FFFFF;
+        
+        if (hum_exp != 0 && hum_exp != 0xFF) {
+            int hum_exp_val = (int)hum_exp - 127;
+            float hum_result = 1.0f;
+            for (int i = 22; i >= 0; i--) {
+                if (hum_mant & (1 << i)) {
+                    hum_result += 1.0f / (1 << (23 - i));
+                }
+            }
+            if (hum_exp_val > 0) hum_result *= (1 << hum_exp_val);
+            else if (hum_exp_val < 0) hum_result /= (1 << (-hum_exp_val));
+            if (hum_sign) hum_result = -hum_result;
+            hum_decoded = hum_result;
+        }
+        
         snprintf(test_msg, sizeof(test_msg), 
                  "Test successful!\r\nTemperature: %.2f°C\r\nPressure: %.2f Pa\r\nHumidity: %.2f%%\r\n",
-                 sensor_data.temperature, sensor_data.pressure, sensor_data.humidity);
+                 temp_decoded, press_decoded, hum_decoded);
     } else {
         snprintf(test_msg, sizeof(test_msg), "Test failed! Error reading sensor data.\r\n");
     }

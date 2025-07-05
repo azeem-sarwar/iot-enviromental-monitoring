@@ -8,8 +8,9 @@
 ../Core/Src/bme680_interface.c:233:7:manual_decode_ieee754	10
 ../Core/Src/bme680_interface.c:272:7:decode_ieee754	1
 ../Core/Src/bme680_interface.c:282:5:is_float_invalid	5
-../Core/Src/bme680_interface.c:303:8:bme680_read_sensor_data	29
-../Core/Src/bme680_interface.c:464:6:bme680_print_sensor_data	1
-../Core/Src/bme680_interface.c:479:6:bme680_check_calibration_data	3
-../Core/Src/bme680_interface.c:524:6:bme680_read_raw_registers	2
-../Core/Src/bme680_interface.c:561:6:bme680_test_sensor	2
+../Core/Src/bme680_interface.c:303:8:bme680_read_sensor_data	43
+../Core/Src/bme680_interface.c:523:6:bme680_print_sensor_data	1
+../Core/Src/bme680_interface.c:538:6:bme680_check_calibration_data	3
+../Core/Src/bme680_interface.c:583:6:bme680_read_raw_adc_values	3
+../Core/Src/bme680_interface.c:629:6:bme680_read_raw_registers	2
+../Core/Src/bme680_interface.c:666:6:bme680_test_sensor	23
