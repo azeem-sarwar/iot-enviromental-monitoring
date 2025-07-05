@@ -104,7 +104,7 @@ int main(void)
   command_interface_send_response("IoT Prototype System - STM32G071RB\r\n");
   command_interface_send_response("========================================\r\n");
   command_interface_send_response("System Clock: 16 MHz\r\n");
-  command_interface_send_response("I2C1 Configuration: PB8 (SCL), PB9 (SDA)\r\n");
+  command_interface_send_response("I2C1 Configuration: PA9 (SCL), PA10 (SDA)\r\n");
   command_interface_send_response("USART2: PA2 (TX), PA3 (RX) - 115200 baud\r\n");
   command_interface_send_response("USART4: PA0 (TX), PA1 (RX) - 115200 baud\r\n");
   command_interface_send_response("LED Status: PA5\r\n");
@@ -114,11 +114,30 @@ int main(void)
   command_interface_send_response_usart4("IoT Prototype System - STM32G071RB\r\n");
   command_interface_send_response_usart4("========================================\r\n");
   command_interface_send_response_usart4("System Clock: 16 MHz\r\n");
-  command_interface_send_response_usart4("I2C1 Configuration: PB8 (SCL), PB9 (SDA)\r\n");
+  command_interface_send_response_usart4("I2C1 Configuration: PA9 (SCL), PA10 (SDA)\r\n");
   command_interface_send_response_usart4("USART2: PA2 (TX), PA3 (RX) - 115200 baud\r\n");
   command_interface_send_response_usart4("USART4: PA0 (TX), PA1 (RX) - 115200 baud\r\n");
   command_interface_send_response_usart4("LED Status: PA5\r\n");
   command_interface_send_response_usart4("========================================\r\n");
+  
+  // Scan I2C bus for devices
+  command_interface_send_response("\r\nScanning I2C bus for devices...\r\n");
+  command_interface_send_response_usart4("\r\nScanning I2C bus for devices...\r\n");
+  i2c_scan_bus();
+  
+  // Test I2C configuration
+  command_interface_send_response("\r\nTesting I2C configuration...\r\n");
+  command_interface_send_response_usart4("\r\nTesting I2C configuration...\r\n");
+  
+  // Test I2C bus with a simple ping
+  HAL_StatusTypeDef i2c_test = HAL_I2C_IsDeviceReady(&hi2c1, 0x76 << 1, 3, 1000);
+  if (i2c_test == HAL_OK) {
+    command_interface_send_response("✓ I2C bus test successful - device responds at 0x76\r\n");
+    command_interface_send_response_usart4("✓ I2C bus test successful - device responds at 0x76\r\n");
+  } else {
+    command_interface_send_response("✗ I2C bus test failed - no device at 0x76\r\n");
+    command_interface_send_response_usart4("✗ I2C bus test failed - no device at 0x76\r\n");
+  }
   
   // Check BME680 sensor presence
   command_interface_send_response("\r\nChecking BME680 sensor presence...\r\n");
@@ -157,8 +176,8 @@ int main(void)
     command_interface_send_response("✗ BME680 sensor not found on I2C bus\r\n");
     command_interface_send_response("Troubleshooting steps:\r\n");
     command_interface_send_response("  1. Check I2C connections:\r\n");
-    command_interface_send_response("     - PB8 (SCL) → BME680 SCL\r\n");
-    command_interface_send_response("     - PB9 (SDA) → BME680 SDA\r\n");
+    command_interface_send_response("     - PA9 (SCL) → BME680 SCL\r\n");
+    command_interface_send_response("     - PA10 (SDA) → BME680 SDA\r\n");
     command_interface_send_response("  2. Verify power supply:\r\n");
     command_interface_send_response("     - BME680 VCC → 3.3V\r\n");
     command_interface_send_response("     - BME680 GND → GND\r\n");
@@ -169,8 +188,8 @@ int main(void)
     command_interface_send_response_usart4("✗ BME680 sensor not found on I2C bus\r\n");
     command_interface_send_response_usart4("Troubleshooting steps:\r\n");
     command_interface_send_response_usart4("  1. Check I2C connections:\r\n");
-    command_interface_send_response_usart4("     - PB8 (SCL) → BME680 SCL\r\n");
-    command_interface_send_response_usart4("     - PB9 (SDA) → BME680 SDA\r\n");
+    command_interface_send_response_usart4("     - PA9 (SCL) → BME680 SCL\r\n");
+    command_interface_send_response_usart4("     - PA10 (SDA) → BME680 SDA\r\n");
     command_interface_send_response_usart4("  2. Verify power supply:\r\n");
     command_interface_send_response_usart4("     - BME680 VCC → 3.3V\r\n");
     command_interface_send_response_usart4("     - BME680 GND → GND\r\n");
@@ -258,7 +277,7 @@ static void MX_I2C1_Init(void)
 
   /* USER CODE END I2C1_Init 1 */
   hi2c1.Instance = I2C1;
-  hi2c1.Init.Timing = 0x00503D58;
+  hi2c1.Init.Timing = 0x00901850; // More conservative timing for 100kHz
   hi2c1.Init.OwnAddress1 = 0;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
   hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
@@ -390,6 +409,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_RESET);
@@ -417,6 +437,14 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure I2C1 pins: PA9 (SCL) and PA10 (SDA) */
+  GPIO_InitStruct.Pin = GPIO_PIN_9|GPIO_PIN_10;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  GPIO_InitStruct.Alternate = GPIO_AF6_I2C1;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */

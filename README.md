@@ -12,8 +12,8 @@ This is an IoT prototype system based on the STM32G071RB Nucleo board that colle
 #### I2C1 (BME680 Sensor)
 | Nucleo Pin | Function | BME680 Pin | Notes |
 |------------|----------|------------|-------|
-| PB8        | I2C1_SCL | SCL        | Clock line |
-| PB9        | I2C1_SDA | SDA        | Data line |
+| PA9        | I2C1_SCL | SCL        | Clock line |
+| PA10       | I2C1_SDA | SDA        | Data line |
 | 3.3V       | VCC      | VCC        | Power supply |
 | GND        | GND      | GND        | Ground |
 
@@ -35,9 +35,9 @@ This is an IoT prototype system based on the STM32G071RB Nucleo board that colle
 NUCLEO-G071RB          BME680 Sensor
 ┌─────────────┐        ┌─────────────┐
 │             │        │             │
-│ PB8 ────────┼────────┤ SCL         │
+│ PA9 ────────┼────────┤ SCL         │
 │             │        │             │
-│ PB9 ────────┼────────┤ SDA         │
+│ PA10 ───────┼────────┤ SDA         │
 │             │        │             │
 │ 3.3V ───────┼────────┤ VCC         │
 │             │        │             │
@@ -134,8 +134,8 @@ Core/
 
 ### 1. Hardware Connection
 1. Connect BME680 sensor to I2C1:
-   - SCL → PB8
-   - SDA → PB9
+   - SCL → PA9
+   - SDA → PA10
    - VCC → 3.3V
    - GND → GND
 
@@ -174,7 +174,7 @@ Core/
 IoT Prototype System - STM32G071RB
 ========================================
 System Clock: 16 MHz
-I2C1 Configuration: PB8 (SCL), PB9 (SDA)
+I2C1 Configuration: PA9 (SCL), PA10 (SDA)
 USART2: PA2 (TX), PA3 (RX) - 115200 baud
 USART4: PA0 (TX), PA1 (RX) - 115200 baud
 LED Status: PA5
@@ -217,7 +217,7 @@ Temperature: 23.45°C
 IoT Prototype System - STM32G071RB
 ========================================
 System Clock: 16 MHz
-I2C1 Configuration: PB8 (SCL), PB9 (SDA)
+I2C1 Configuration: PA9 (SCL), PA10 (SDA)
 USART2: PA2 (TX), PA3 (RX) - 115200 baud
 USART4: PA0 (TX), PA1 (RX) - 115200 baud
 LED Status: PA5
@@ -250,7 +250,7 @@ Humidity: 45.67%
 IoT Prototype System - STM32G071RB
 ========================================
 System Clock: 16 MHz
-I2C1 Configuration: PB8 (SCL), PB9 (SDA)
+I2C1 Configuration: PA9 (SCL), PA10 (SDA)
 USART2: PA2 (TX), PA3 (RX) - 115200 baud
 USART4: PA0 (TX), PA1 (RX) - 115200 baud
 LED Status: PA5
@@ -260,8 +260,8 @@ Checking BME680 sensor presence...
 ✗ BME680 sensor not found on I2C bus
 Troubleshooting steps:
   1. Check I2C connections:
-     - PB8 (SCL) → BME680 SCL
-     - PB9 (SDA) → BME680 SDA
+     - PA9 (SCL) → BME680 SCL
+     - PA10 (SDA) → BME680 SDA
   2. Verify power supply:
      - BME680 VCC → 3.3V
      - BME680 GND → GND

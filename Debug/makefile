@@ -61,7 +61,7 @@ main-build: final_embedded_project.elf secondary-outputs
 
 # Tool invocations
 final_embedded_project.elf final_embedded_project.map: $(OBJS) $(USER_OBJS) C:\Users\azeem\STM32CubeIDE\workspace_1.18.1\final_embedded_project\STM32G071RBTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "final_embedded_project.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m0plus -T"C:\Users\azeem\STM32CubeIDE\workspace_1.18.1\final_embedded_project\STM32G071RBTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="final_embedded_project.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+	arm-none-eabi-gcc -o "final_embedded_project.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m0plus -T"C:\Users\azeem\STM32CubeIDE\workspace_1.18.1\final_embedded_project\STM32G071RBTX_FLASH.ld" -Wl,-Map="final_embedded_project.map" -Wl,--gc-sections -static --specs=nosys.specs -u _printf_float --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

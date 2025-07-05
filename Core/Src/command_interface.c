@@ -116,6 +116,9 @@ void command_interface_show_help(void)
     command_interface_send_response("read pressure   - Read pressure from BME680\r\n");
     command_interface_send_response("read humidity   - Read humidity from BME680\r\n");
     command_interface_send_response("test sensor     - Test BME680 sensor\r\n");
+    command_interface_send_response("raw registers   - Read raw BME680 registers\r\n");
+    command_interface_send_response("calib data      - Check BME680 calibration data\r\n");
+    command_interface_send_response("scan i2c        - Scan I2C bus for devices\r\n");
     command_interface_send_response("sum <num1> <num2> - Add two numbers\r\n");
     command_interface_send_response("sub <num1> <num2> - Subtract num2 from num1\r\n");
     command_interface_send_response("mul <num1> <num2> - Multiply two numbers\r\n");
@@ -155,6 +158,15 @@ void command_interface_handle_command(char* command)
     else if (strcmp(command, "test sensor") == 0) {
         cmd_test_sensor();
     }
+    else if (strcmp(command, "raw registers") == 0) {
+        bme680_read_raw_registers();
+    }
+    else if (strcmp(command, "calib data") == 0) {
+        bme680_check_calibration_data();
+    }
+    else if (strcmp(command, "scan i2c") == 0) {
+        i2c_scan_bus();
+    }
     else if (strncmp(command, "sum ", 4) == 0) {
         cmd_math_operation(command);
     }
@@ -193,6 +205,7 @@ void cmd_read_temperature(void)
 {
     struct bme68x_data sensor_data;
     char response[128];
+    char debug_msg[128];
     
     // Check if sensor is available
     if (bme680_check_sensor_presence() != BME68X_OK) {
@@ -202,7 +215,48 @@ void cmd_read_temperature(void)
     }
     
     if (bme680_read_sensor_data(&sensor_data) == BME68X_OK) {
-        snprintf(response, sizeof(response), "Temperature: %.2f°C\r\n", sensor_data.temperature);
+        // Decode the IEEE 754 value from memory
+        uint32_t temp_mem = *(uint32_t*)&sensor_data.temperature;
+        float temp_decoded = decode_ieee754(temp_mem);
+        
+        // Direct IEEE 754 calculation for temperature
+        uint32_t temp_sign = (temp_mem >> 31) & 0x1;
+        uint32_t temp_exp = (temp_mem >> 23) & 0xFF;
+        uint32_t temp_mant = temp_mem & 0x7FFFFF;
+        
+        if (temp_exp != 0 && temp_exp != 0xFF) {
+            int temp_exp_val = (int)temp_exp - 127;
+            float temp_result = 1.0f;
+            
+            // Calculate mantissa
+            for (int i = 22; i >= 0; i--) {
+                if (temp_mant & (1 << i)) {
+                    temp_result += 1.0f / (1 << (23 - i));
+                }
+            }
+            
+            // Apply exponent
+            if (temp_exp_val > 0) {
+                temp_result *= (1 << temp_exp_val);
+            } else if (temp_exp_val < 0) {
+                temp_result /= (1 << (-temp_exp_val));
+            }
+            
+            // Apply sign
+            if (temp_sign) temp_result = -temp_result;
+            
+            temp_decoded = temp_result;
+        }
+        
+        // Debug: Print the raw value before formatting
+        snprintf(debug_msg, sizeof(debug_msg), "DEBUG: Raw temperature value: %.6f\r\n", temp_decoded);
+        command_interface_send_response(debug_msg);
+        
+        snprintf(response, sizeof(response), "Temperature: %.2f°C\r\n", temp_decoded);
+        
+        // Debug: Print the formatted string
+        snprintf(debug_msg, sizeof(debug_msg), "DEBUG: Formatted string: '%.80s'\r\n", response);
+        command_interface_send_response(debug_msg);
     } else {
         snprintf(response, sizeof(response), "Error reading temperature from BME680\r\n");
     }
@@ -318,6 +372,9 @@ void command_interface_show_help_usart4(void)
     command_interface_send_response_usart4("read pressure   - Read pressure from BME680\r\n");
     command_interface_send_response_usart4("read humidity   - Read humidity from BME680\r\n");
     command_interface_send_response_usart4("test sensor     - Test BME680 sensor\r\n");
+    command_interface_send_response_usart4("raw registers   - Read raw BME680 registers\r\n");
+    command_interface_send_response_usart4("calib data      - Check BME680 calibration data\r\n");
+    command_interface_send_response_usart4("scan i2c        - Scan I2C bus for devices\r\n");
     command_interface_send_response_usart4("sum <num1> <num2> - Add two numbers\r\n");
     command_interface_send_response_usart4("sub <num1> <num2> - Subtract num2 from num1\r\n");
     command_interface_send_response_usart4("mul <num1> <num2> - Multiply two numbers\r\n");
@@ -356,6 +413,15 @@ void command_interface_handle_command_usart4(char* command)
     }
     else if (strcmp(command, "test sensor") == 0) {
         cmd_test_sensor_usart4();
+    }
+    else if (strcmp(command, "raw registers") == 0) {
+        bme680_read_raw_registers();
+    }
+    else if (strcmp(command, "calib data") == 0) {
+        bme680_check_calibration_data();
+    }
+    else if (strcmp(command, "scan i2c") == 0) {
+        i2c_scan_bus();
     }
     else if (strncmp(command, "sum ", 4) == 0) {
         cmd_math_operation_usart4(command);

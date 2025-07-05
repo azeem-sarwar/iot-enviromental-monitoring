@@ -16,5 +16,9 @@ int8_t bme680_read_sensor_data(struct bme68x_data *data);
 void bme680_print_sensor_data(struct bme68x_data *data);
 void bme680_test_sensor(void);
 int8_t bme680_check_sensor_presence(void);
+void i2c_scan_bus(void);
+void bme680_read_raw_registers(void);
+void bme680_check_calibration_data(void);
+float decode_ieee754(uint32_t hex_value);
 
 #endif // __BME680_INTERFACE_H__ 
