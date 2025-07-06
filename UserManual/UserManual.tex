@@ -1,0 +1,813 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{float}
+\usepackage{wrapfig}
+\usepackage{rotating}
+\usepackage{makeidx}
+\usepackage{nomencl}
+\usepackage{verbatim}
+\usepackage{moreverb}
+\usepackage{url}
+\usepackage{stmaryrd}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{amsbsy}
+\usepackage{eucal}
+\usepackage{mathrsfs}
+\usepackage{textcomp}
+\usepackage{gensymb}
+
+% Page setup
+\geometry{
+    left=2.5cm,
+    right=2.5cm,
+    top=2.5cm,
+    bottom=2.5cm
+}
+
+% Header and footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{STM32G071RB IoT Project}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% Title formatting
+\titleformat{\section}{\Large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{1em}{}
+
+% Code listing setup
+\lstset{
+    language=C,
+    basicstyle=\ttfamily\footnotesize,
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!60!black},
+    stringstyle=\color{red},
+    numbers=left,
+    numberstyle=\tiny,
+    numbersep=5pt,
+    frame=single,
+    breaklines=true,
+    postbreak=\mbox{\textcolor{red}{$\hookrightarrow$}\space},
+    showstringspaces=false,
+    tabsize=4,
+    captionpos=b
+}
+
+% Hyperref setup
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=cyan,
+    citecolor=green,
+    pdftitle={STM32G071RB IoT Project User Manual},
+    pdfauthor={Embedded Systems Project},
+    pdfsubject={IoT Prototype with LoRa and BME680},
+    pdfkeywords={STM32, LoRa, BME680, IoT, Embedded}
+}
+
+% Custom commands
+\newcommand{\pin}[1]{\texttt{#1}}
+\newcommand{\command}[1]{\texttt{#1}}
+\newcommand{\warning}[1]{\textbf{\textcolor{red}{WARNING:}} #1}
+\newcommand{\note}[1]{\textbf{\textcolor{blue}{NOTE:}} #1}
+\newcommand{\tip}[1]{\textbf{\textcolor{green}{TIP:}} #1}
+
+% Document info
+\title{\Huge\textbf{STM32G071RB IoT Project\\User Manual}}
+\author{Embedded Systems Project}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This user manual provides comprehensive documentation for the STM32G071RB IoT prototype system featuring LoRa wireless communication and BME680 environmental sensor integration. The system enables wireless sensor data transmission, environmental monitoring, and remote command control through dual UART interfaces. This manual covers hardware setup, software configuration, command interface usage, troubleshooting, and development guidelines.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{System Overview}
+
+\subsection{Project Description}
+The STM32G071RB IoT prototype is an embedded system designed for wireless sensor data transmission and environmental monitoring. The system integrates a BME680 environmental sensor for temperature, pressure, and humidity measurements, and an SX126x LoRa module for long-range wireless communication.
+
+\subsection{Key Features}
+\begin{itemize}
+    \item \textbf{Environmental Sensing}: BME680 sensor for temperature, pressure, and humidity
+    \item \textbf{Wireless Communication}: LoRa (SX126x) for long-range data transmission
+    \item \textbf{Dual UART Interface}: USART2 and USART4 for command and debugging
+    \item \textbf{I2C Communication}: For BME680 sensor interface
+    \item \textbf{SPI Communication}: For LoRa module interface
+    \item \textbf{Real-time Monitoring}: Continuous sensor data acquisition and transmission
+    \item \textbf{Command Interface}: Interactive command system for system control
+\end{itemize}
+
+\subsection{Technical Specifications}
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Parameter} & \textbf{Specification} \\
+\hline
+Microcontroller & STM32G071RBT6 \\
+\hline
+System Clock & 16 MHz \\
+\hline
+Operating Voltage & 3.3V \\
+\hline
+LoRa Frequency & 868 MHz \\
+\hline
+LoRa Spreading Factor & SF7 \\
+\hline
+LoRa Bandwidth & 125 kHz \\
+\hline
+UART Baud Rate & 115200 bps \\
+\hline
+I2C Speed & 100 kHz \\
+\hline
+SPI Speed & 8 MHz \\
+\hline
+\end{tabular}
+\caption{System Technical Specifications}
+\end{table}
+
+\section{Hardware Setup}
+
+\subsection{Required Components}
+\begin{itemize}
+    \item STM32G071RB Nucleo-64 board
+    \item BME680 environmental sensor module
+    \item SX126x LoRa module (e.g., SX1262, SX1268)
+    \item USB-to-UART converter (for USART4)
+    \item Breadboard and jumper wires
+    \item 4.7kOhm pull-up resistors (for I2C)
+    \item Power supply (3.3V)
+\end{itemize}
+
+\subsection{Pin Connections}
+
+\subsubsection{STM32G071RB Pinout}
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Pin} & \textbf{Function} & \textbf{Connection} \\
+\hline
+PA2 & USART2 TX & USB-to-UART RX \\
+\hline
+PA3 & USART2 RX & USB-to-UART TX \\
+\hline
+PA0 & USART4 TX & USB-to-UART RX \\
+\hline
+PA1 & USART4 RX & USB-to-UART TX \\
+\hline
+PA9 & I2C1 SCL & BME680 SCL \\
+\hline
+PA10 & I2C1 SDA & BME680 SDA \\
+\hline
+PA5 & SPI1 SCK & LoRa SCK \\
+\hline
+PA6 & SPI1 MISO & LoRa MISO \\
+\hline
+PA7 & SPI1 MOSI & LoRa MOSI \\
+\hline
+PA4 & SPI1 NSS & LoRa NSS \\
+\hline
+PC0 & GPIO & LoRa RESET \\
+\hline
+PA8 & GPIO & LoRa DIO1 \\
+\hline
+\end{tabular}
+\caption{STM32G071RB Pin Connections}
+\end{table}
+
+\subsubsection{BME680 Sensor Connections}
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{BME680 Pin} & \textbf{STM32 Pin} & \textbf{Description} \\
+\hline
+VCC & 3.3V & Power supply \\
+\hline
+GND & GND & Ground \\
+\hline
+SCL & PA9 & I2C clock line \\
+\hline
+SDA & PA10 & I2C data line \\
+\hline
+\end{tabular}
+\caption{BME680 Sensor Connections}
+\end{table}
+
+\subsubsection{LoRa Module Connections}
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{LoRa Pin} & \textbf{STM32 Pin} & \textbf{Description} \\
+\hline
+VCC & 3.3V & Power supply \\
+\hline
+GND & GND & Ground \\
+\hline
+SCK & PA5 & SPI clock \\
+\hline
+MISO & PA6 & SPI data in \\
+\hline
+MOSI & PA7 & SPI data out \\
+\hline
+NSS & PA4 & SPI chip select \\
+\hline
+RESET & PC0 & Module reset \\
+\hline
+DIO1 & PA8 & Interrupt line \\
+\hline
+\end{tabular}
+\caption{LoRa Module Connections}
+\end{table}
+
+\section{Software Architecture}
+
+\subsection{Project Structure}
+The project follows a modular architecture with the following components:
+
+\begin{itemize}
+    \item \textbf{main.c}: System initialization and main loop
+    \item \textbf{bme680\_interface.c}: BME680 sensor driver and interface
+    \item \textbf{lora\_interface.c}: LoRa communication interface
+    \item \textbf{command\_interface.c}: Command processing and user interface
+    \item \textbf{sx126x.c}: SX126x LoRa driver (external library)
+\end{itemize}
+
+\subsection{System Initialization Flow}
+\begin{enumerate}
+    \item Hardware initialization (GPIO, UART, I2C, SPI)
+    \item BME680 sensor detection and initialization
+    \item LoRa module detection and configuration
+    \item Command interface startup
+    \item Main loop execution
+\end{enumerate}
+
+\subsection{Communication Protocols}
+
+\subsubsection{I2C Protocol (BME680)}
+\begin{itemize}
+    \item \textbf{Clock Speed}: 100 kHz
+    \item \textbf{Device Address}: 0x76 (default) or 0x77
+    \item \textbf{Data Format}: 8-bit data, 7-bit address
+    \item \textbf{Pull-up Resistors}: 4.7kOhm recommended
+\end{itemize}
+
+\subsubsection{SPI Protocol (LoRa)}
+\begin{itemize}
+    \item \textbf{Clock Speed}: 8 MHz
+    \item \textbf{Mode}: SPI Mode 0 (CPOL=0, CPHA=0)
+    \item \textbf{Data Order}: MSB first
+    \item \textbf{Chip Select}: Active low
+\end{itemize}
+
+\subsubsection{UART Protocol}
+\begin{itemize}
+    \item \textbf{Baud Rate}: 115200 bps
+    \item \textbf{Data Bits}: 8
+    \item \textbf{Parity}: None
+    \item \textbf{Stop Bits}: 1
+    \item \textbf{Flow Control}: None
+\end{itemize}
+
+\section{Command Interface}
+
+\subsection{Getting Started}
+\begin{enumerate}
+    \item Connect the hardware according to the wiring diagram
+    \item Power on the STM32 board
+    \item Open a terminal application (PuTTY, Tera Term, etc.)
+    \item Configure the terminal:
+        \begin{itemize}
+            \item Baud Rate: 115200
+            \item Data Bits: 8
+            \item Parity: None
+            \item Stop Bits: 1
+            \item Flow Control: None
+        \end{itemize}
+    \item Connect to the appropriate COM port
+    \item Type \command{start} to begin the command interface
+\end{enumerate}
+
+\subsection{Available Commands}
+
+\subsubsection{Sensor Commands}
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Command} & \textbf{Alias} & \textbf{Description} \\
+\hline
+\texttt{read temperature} & \texttt{rt} & Read temperature from BME680 \\
+\hline
+\texttt{read pressure} & \texttt{rp} & Read pressure from BME680 \\
+\hline
+\texttt{read humidity} & \texttt{rh} & Read humidity from BME680 \\
+\hline
+\texttt{test sensor} & \texttt{ts} & Test BME680 sensor functionality \\
+\hline
+\texttt{raw registers} & \texttt{rr} & Read raw BME680 registers \\
+\hline
+\texttt{raw adc} & \texttt{ra} & Read raw BME680 ADC values \\
+\hline
+\texttt{calib data} & \texttt{cd} & Check BME680 calibration data \\
+\hline
+\texttt{scan i2c} & \texttt{si} & Scan I2C bus for devices \\
+\hline
+\end{tabular}
+\caption{Sensor Commands}
+\end{table}
+
+\subsubsection{LoRa Commands}
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Command} & \textbf{Alias} & \textbf{Description} \\
+\hline
+\texttt{lora broadcast} & \texttt{lb} & Broadcast sensor data via LoRa \\
+\hline
+\texttt{lora config} & \texttt{lc} & Show LoRa configuration \\
+\hline
+\texttt{lora test} & \texttt{lt} & Test LoRa transmission \\
+\hline
+\texttt{lora scan} & \texttt{ls} & Scan for LoRa signals (5s) \\
+\hline
+\texttt{lora monitor} & \texttt{lm} & Start continuous monitoring \\
+\hline
+\texttt{lora stop} & \texttt{lst} & Stop LoRa monitoring \\
+\hline
+\texttt{lora rssi} & \texttt{lr} & Get current RSSI \\
+\hline
+\end{tabular}
+\caption{LoRa Commands}
+\end{table}
+
+\subsubsection{System Commands}
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Command} & \textbf{Description} \\
+\hline
+\texttt{help} & Show help menu \\
+\hline
+\texttt{start} & Start the command interface \\
+\hline
+\end{tabular}
+\caption{System Commands}
+\end{table}
+
+\subsubsection{Math Operations}
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Command} & \textbf{Description} \\
+\hline
+\texttt{sum <num1> <num2>} & Add two numbers \\
+\hline
+\texttt{sub <num1> <num2>} & Subtract num2 from num1 \\
+\hline
+\texttt{mul <num1> <num2>} & Multiply two numbers \\
+\hline
+\texttt{div <num1> <num2>} & Divide num1 by num2 \\
+\hline
+\end{tabular}
+\caption{Math Operations}
+\end{table}
+
+\subsection{Command Examples}
+
+\subsubsection{Sensor Data Reading}
+\begin{lstlisting}[caption=Reading Sensor Data]
+> start
+System started! Type 'help' for available commands.
+> rt
+Temperature: 23.45 C
+> rp
+Pressure: 1013.25 hPa
+> rh
+Humidity: 45.67%
+> ts
+Sensor Test Results:
+- Temperature: 23.45 C
+- Pressure: 1013.25 hPa
+- Humidity: 45.67%
+- Status: OK
+\end{lstlisting}
+
+\subsubsection{LoRa Communication}
+\begin{lstlisting}[caption=LoRa Communication]
+> lb
+Broadcasting sensor data via LoRa...
+Message sent: {"temp":23.45,"press":1013.25,"hum":45.67,"node":"STM32"}
+> lc
+LoRa Configuration:
+- Frequency: 868000000 Hz
+- Spreading Factor: SF7
+- Bandwidth: 125 kHz
+- Coding Rate: 4/5
+- TX Power: 14 dBm
+- Sync Word: 0x12
+> ls
+Scanning for LoRa signals...
+RSSI: -85 dBm
+Signal detected at 868.0 MHz
+\end{lstlisting}
+
+\section{Troubleshooting}
+
+\subsection{Common Issues and Solutions}
+
+\subsubsection{BME680 Sensor Issues}
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Problem} & \textbf{Cause} & \textbf{Solution} \\
+\hline
+Sensor not detected & Wrong I2C address & Check SDO pin connection \\
+\hline
+Communication errors & Missing pull-up resistors & Add 4.7kOhm resistors to SCL/SDA \\
+\hline
+Invalid readings & Power supply issues & Ensure 3.3V stable supply \\
+\hline
+I2C bus errors & Wiring issues & Verify SCL/PA9 and SDA/PA10 connections \\
+\hline
+\end{tabular}
+\caption{BME680 Troubleshooting}
+\end{table}
+
+\subsubsection{LoRa Module Issues}
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Problem} & \textbf{Cause} & \textbf{Solution} \\
+\hline
+Module not detected & SPI wiring issues & Check SCK, MISO, MOSI, NSS connections \\
+\hline
+Transmission failures & Antenna not connected & Connect proper LoRa antenna \\
+\hline
+Low signal strength & Wrong frequency & Verify 868 MHz configuration \\
+\hline
+Communication errors & SPI speed too high & Reduce SPI clock frequency \\
+\hline
+\end{tabular}
+\caption{LoRa Troubleshooting}
+\end{table}
+
+\subsubsection{UART Communication Issues}
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Problem} & \textbf{Cause} & \textbf{Solution} \\
+\hline
+No communication & Wrong COM port & Check Device Manager for correct port \\
+\hline
+Garbled text & Wrong baud rate & Set to 115200 bps \\
+\hline
+Missing characters & Flow control enabled & Disable hardware flow control \\
+\hline
+Connection drops & Driver issues & Update USB-to-UART driver \\
+\hline
+\end{tabular}
+\caption{UART Troubleshooting}
+\end{table}
+
+\subsection{Diagnostic Commands}
+Use these commands to diagnose system issues:
+
+\begin{itemize}
+    \item \command{scan i2c}: Check I2C bus for connected devices
+    \item \command{raw registers}: Read raw BME680 registers for debugging
+    \item \command{lora config}: Verify LoRa module configuration
+    \item \command{lora rssi}: Check signal strength
+\end{itemize}
+
+\subsection{System Status Messages}
+The system provides status messages during initialization:
+
+\begin{lstlisting}[caption=System Initialization Messages]
+========================================
+IoT Prototype System - STM32G071RB
+========================================
+System Clock: 16 MHz
+I2C1 Configuration: PA9 (SCL), PA10 (SDA)
+USART2: PA2 (TX), PA3 (RX) - 115200 baud
+USART4: PA0 (TX), PA1 (RX) - 115200 baud
+SPI1: PA5 (SCK), PA6 (MISO), PA7 (MOSI)
+LoRa: PA4 (NSS), PC0 (RESET)
+LED Status: PA5
+========================================
+\end{lstlisting}
+
+\section{Development Guidelines}
+
+\subsection{Adding New Commands}
+To add new commands to the system:
+
+\begin{enumerate}
+    \item Add command handler in \texttt{command\_interface.c}
+    \item Update help menu with new command description
+    \item Implement command functionality
+    \item Test with both USART2 and USART4 interfaces
+\end{enumerate}
+
+\subsection{Modifying Sensor Configuration}
+To modify BME680 sensor settings:
+
+\begin{lstlisting}[caption=BME680 Configuration Example]
+struct bme68x_conf conf;
+conf.os_hum = BME68X_OS_2X;    // Humidity oversampling
+conf.os_pres = BME68X_OS_4X;   // Pressure oversampling
+conf.os_temp = BME68X_OS_2X;   // Temperature oversampling
+conf.filter = BME68X_FILTER_SIZE_3; // IIR filter
+conf.odr = BME68X_ODR_1000_MS; // Output data rate
+\end{lstlisting}
+
+\subsection{Modifying LoRa Parameters}
+To modify LoRa communication parameters:
+
+\begin{lstlisting}[caption=LoRa Configuration Example]
+static sx126x_mod_params_lora_t lora_mod_params = {
+    .sf = SX126X_LORA_SF8,        // Spreading factor
+    .bw = SX126X_LORA_BW_250,     // Bandwidth
+    .cr = SX126X_LORA_CR_4_7,     // Coding rate
+    .ldro = 1                     // Low data rate optimization
+};
+\end{lstlisting}
+
+\section{Performance Characteristics}
+
+\subsection{Sensor Performance}
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Parameter} & \textbf{Range} & \textbf{Accuracy} \\
+\hline
+Temperature & -40C to +85C & +/-0.5C \\
+\hline
+Pressure & 300 hPa to 1100 hPa & +/-1 hPa \\
+\hline
+Humidity & 0\% to 100\% & +/-3\% \\
+\hline
+\end{tabular}
+\caption{BME680 Performance Specifications}
+\end{table}
+
+\subsection{LoRa Performance}
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Parameter} & \textbf{Value} & \textbf{Description} \\
+\hline
+Frequency & 868 MHz & Operating frequency \\
+\hline
+Range & Up to 15 km & Line of sight \\
+\hline
+Data Rate & 5.47 kbps & With SF7, 125 kHz BW \\
+\hline
+TX Power & 14 dBm & Maximum output power \\
+\hline
+\end{tabular}
+\caption{LoRa Performance Specifications}
+\end{table}
+
+\subsection{System Performance}
+\begin{itemize}
+    \item \textbf{Command Response Time}: < 100 ms
+    \item \textbf{Sensor Read Time}: < 50 ms
+    \item \textbf{LoRa Transmission Time}: < 200 ms
+    \item \textbf{Power Consumption}: ~50 mA (active mode)
+\end{itemize}
+
+\section{Advanced Features}
+
+\subsection{Continuous Monitoring}
+The system supports continuous LoRa monitoring for detecting signals from other devices:
+
+\begin{lstlisting}[caption=Continuous Monitoring]
+> lm
+Starting continuous LoRa monitoring...
+Monitoring for signals...
+RSSI: -87 dBm
+Packet received: {"temp":24.1,"press":1012.8,"hum":48.2,"node":"Node2"}
+RSSI: -92 dBm
+Signal detected (no packet)
+> lst
+Monitoring stopped.
+\end{lstlisting}
+
+\subsection{Sensor Data Broadcasting}
+Automatic broadcasting of sensor data in JSON format:
+
+\begin{lstlisting}[caption=Sensor Data Broadcast]
+> lb
+Broadcasting sensor data via LoRa...
+Message sent: {"temp":23.45,"press":1013.25,"hum":45.67,"node":"STM32"}
+\end{lstlisting}
+
+\subsection{I2C Bus Scanning}
+Automatic detection of I2C devices:
+
+\begin{lstlisting}[caption=I2C Bus Scan]
+> si
+Scanning I2C bus for devices...
+Device found at address: 0x76
+Total devices found: 1
+\end{lstlisting}
+
+\section{Maintenance and Support}
+
+\subsection{Regular Maintenance}
+\begin{itemize}
+    \item Check physical connections monthly
+    \item Verify sensor calibration annually
+    \item Update firmware as needed
+    \item Monitor system logs for errors
+\end{itemize}
+
+\subsection{Calibration}
+The BME680 sensor includes factory calibration data. For high-precision applications:
+
+\begin{itemize}
+    \item Use reference instruments for comparison
+    \item Apply offset corrections in software
+    \item Consider environmental factors
+    \item Document calibration procedures
+\end{itemize}
+
+\subsection{Technical Support}
+For technical support and questions:
+
+\begin{itemize}
+    \item Check this user manual first
+    \item Review troubleshooting section
+    \item Verify hardware connections
+    \item Test with known good components
+\end{itemize}
+
+\section{Appendices}
+
+\subsection{Appendix A: Pin Definitions}
+\begin{lstlisting}[caption=Pin Definitions in main.h]
+// UART Pins
+#define UART2_TX_PIN GPIO_PIN_2
+#define UART2_TX_PORT GPIOA
+#define UART2_RX_PIN GPIO_PIN_3
+#define UART2_RX_PORT GPIOA
+
+#define UART4_TX_PIN GPIO_PIN_0
+#define UART4_TX_PORT GPIOA
+#define UART4_RX_PIN GPIO_PIN_1
+#define UART4_RX_PORT GPIOA
+
+// I2C Pins
+#define I2C1_SCL_PIN GPIO_PIN_9
+#define I2C1_SCL_PORT GPIOA
+#define I2C1_SDA_PIN GPIO_PIN_10
+#define I2C1_SDA_PORT GPIOA
+
+// SPI Pins
+#define SPI1_SCK_PIN GPIO_PIN_5
+#define SPI1_SCK_PORT GPIOA
+#define SPI1_MISO_PIN GPIO_PIN_6
+#define SPI1_MISO_PORT GPIOA
+#define SPI1_MOSI_PIN GPIO_PIN_7
+#define SPI1_MOSI_PORT GPIOA
+#define SPI1_NSS_PIN GPIO_PIN_4
+#define SPI1_NSS_PORT GPIOA
+
+// LoRa Control Pins
+#define LORA_RESET_PIN GPIO_PIN_0
+#define LORA_RESET_PORT GPIOC
+#define LORA_DIO1_PIN GPIO_PIN_8
+#define LORA_DIO1_PORT GPIOA
+\end{lstlisting}
+
+\subsection{Appendix B: Configuration Constants}
+\begin{lstlisting}[caption=Configuration Constants]
+// LoRa Configuration
+#define LORA_FREQUENCY_HZ        868000000
+#define LORA_TX_POWER_DBM        14
+#define LORA_SYNC_WORD           0x12
+#define LORA_PAYLOAD_LENGTH      64
+
+// BME680 Configuration
+#define BME68X_I2C_ADDR_LOW      0x76
+#define BME68X_I2C_ADDR_HIGH     0x77
+#define BME68X_CHIP_ID           0x61
+
+// System Configuration
+#define CMD_BUFFER_SIZE          128
+#define SYSTEM_CLOCK_HZ          16000000
+\end{lstlisting}
+
+\subsection{Appendix C: Error Codes}
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Error Code} & \textbf{Description} & \textbf{Action} \\
+\hline
+BME68X\_OK & Operation successful & None \\
+\hline
+BME68X\_E\_COM\_FAIL & Communication failure & Check I2C connections \\
+\hline
+BME68X\_E\_DEV\_NOT\_FOUND & Device not found & Check sensor power and address \\
+\hline
+SX126X\_STATUS\_OK & LoRa operation successful & None \\
+\hline
+SX126X\_STATUS\_ERROR & LoRa operation failed & Check SPI connections \\
+\hline
+HAL\_OK & HAL operation successful & None \\
+\hline
+HAL\_ERROR & HAL operation failed & Check hardware connections \\
+\hline
+\end{tabular}
+\caption{Error Codes and Descriptions}
+\end{table}
+
+\subsection{Appendix D: Command Reference}
+\begin{longtable}{|l|l|l|}
+\hline
+\textbf{Command} & \textbf{Alias} & \textbf{Description} \\
+\hline
+\endhead
+\hline
+\endfoot
+\texttt{start} & - & Start command interface \\
+\hline
+\texttt{help} & - & Show help menu \\
+\hline
+\texttt{read temperature} & \texttt{rt} & Read temperature (C) \\
+\hline
+\texttt{read pressure} & \texttt{rp} & Read pressure (hPa) \\
+\hline
+\texttt{read humidity} & \texttt{rh} & Read humidity (\%) \\
+\hline
+\texttt{test sensor} & \texttt{ts} & Test BME680 sensor \\
+\hline
+\texttt{raw registers} & \texttt{rr} & Read raw registers \\
+\hline
+\texttt{raw adc} & \texttt{ra} & Read raw ADC values \\
+\hline
+\texttt{calib data} & \texttt{cd} & Check calibration data \\
+\hline
+\texttt{scan i2c} & \texttt{si} & Scan I2C bus \\
+\hline
+\texttt{lora broadcast} & \texttt{lb} & Broadcast sensor data \\
+\hline
+\texttt{lora config} & \texttt{lc} & Show LoRa config \\
+\hline
+\texttt{lora test} & \texttt{lt} & Test LoRa transmission \\
+\hline
+\texttt{lora scan} & \texttt{ls} & Scan for signals (5s) \\
+\hline
+\texttt{lora monitor} & \texttt{lm} & Start monitoring \\
+\hline
+\texttt{lora stop} & \texttt{lst} & Stop monitoring \\
+\hline
+\texttt{lora rssi} & \texttt{lr} & Get RSSI \\
+\hline
+\texttt{sum <n1> <n2>} & - & Add numbers \\
+\hline
+\texttt{sub <n1> <n2>} & - & Subtract numbers \\
+\hline
+\texttt{mul <n1> <n2>} & - & Multiply numbers \\
+\hline
+\texttt{div <n1> <n2>} & - & Divide numbers \\
+\hline
+\end{longtable}
+
+\end{document} 

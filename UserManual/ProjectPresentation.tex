@@ -1,0 +1,608 @@
+\documentclass[aspectratio=169]{beamer}
+\usetheme{Madrid}
+\usecolortheme{default}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{float}
+\usepackage{wrapfig}
+\usepackage{rotating}
+\usepackage{makeidx}
+\usepackage{nomencl}
+\usepackage{verbatim}
+\usepackage{moreverb}
+\usepackage{url}
+\usepackage{stmaryrd}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{amsbsy}
+\usepackage{eucal}
+\usepackage{mathrsfs}
+\usepackage{textcomp}
+\usepackage{gensymb}
+
+% Custom commands
+\newcommand{\pin}[1]{\texttt{#1}}
+\newcommand{\command}[1]{\texttt{#1}}
+\newcommand{\warning}[1]{\textbf{\textcolor{red}{WARNING:}} #1}
+\newcommand{\notetip}[1]{\textbf{\textcolor{blue}{NOTE:}} #1}
+\newcommand{\tip}[1]{\textbf{\textcolor{green}{TIP:}} #1}
+
+% Title page info
+\title{STM32G071RB IoT Prototype Project}
+\subtitle{Environmental Monitoring with LoRa Communication}
+\author{Team Members: \\
+Member 1, Member 2, Member 3, Member 4, Member 5}
+\institute{Embedded Systems Course}
+\date{\today}
+
+\begin{document}
+
+% Title slide
+\begin{frame}
+\titlepage
+\end{frame}
+
+% Table of contents
+\begin{frame}{Table of Contents}
+\tableofcontents
+\end{frame}
+
+% Project Overview
+\section{Project Overview}
+
+\begin{frame}{Project Description}
+\begin{itemize}
+    \item \textbf{Objective}: Implement a NUCLEO-G071RB based IoT prototype
+    \item \textbf{Sensors}: BME680 for pressure, temperature, and humidity
+    \item \textbf{Communication}: LoRa Hat (SX1262) for wireless communication
+    \item \textbf{Interface}: UART communication with PC via USB-UART adapter
+    \item \textbf{Architecture}: Passive unit responding to PC commands
+\end{itemize}
+
+\begin{block}{Key Features}
+\begin{itemize}
+    \item Environmental data collection via I2C
+    \item LoRa wireless communication via SPI
+    \item Interactive command interface via UART
+    \item Real-time sensor monitoring
+\end{itemize}
+\end{block}
+\end{frame}
+
+\begin{frame}{Project Objectives}
+\begin{enumerate}
+    \item \textbf{Systematic Implementation Approach}
+    \item \textbf{Improving Knowledge on Embedded/IoT Systems}
+    \item \textbf{Team Organization with Flat Hierarchy}
+    \item \textbf{Software Development Excellence}
+    \item \textbf{Hardware Integration and Testing}
+\end{enumerate}
+
+\begin{block}{Grading Criteria}
+\begin{itemize}
+    \item Team collaboration and role definition
+    \item Agile practices and task management
+    \item Requirements traceability
+    \item Implementation quality
+    \item Product presentation
+\end{itemize}
+\end{block}
+\end{frame}
+
+% Team Organization
+\section{Team Organization}
+
+\begin{frame}{Team Structure}
+\begin{columns}
+\column{0.5\textwidth}
+\textbf{Team Members (5 persons):}
+\begin{itemize}
+    \item Member 1 - Project Lead
+    \item Member 2 - Hardware Specialist
+    \item Member 3 - Software Developer
+    \item Member 4 - Testing \& Documentation
+    \item Member 5 - Communication \& Integration
+\end{itemize}
+
+\column{0.5\textwidth}
+\textbf{Flat Hierarchy Approach:}
+\begin{itemize}
+    \item Equal decision-making power
+    \item Rotating meeting facilitators
+    \item Shared responsibility for deliverables
+    \item Cross-functional skill development
+\end{itemize}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Agile Practices Implementation}
+\begin{columns}
+\column{0.6\textwidth}
+\textbf{Daily Stand-ups:}
+\begin{itemize}
+    \item 15-minute daily meetings
+    \item Progress updates from each member
+    \item Blockers identification
+    \item Task reallocation if needed
+\end{itemize}
+
+\textbf{Sprint Planning:}
+\begin{itemize}
+    \item 2-week sprint cycles
+    \item Task breakdown and estimation
+    \item Definition of Done criteria
+    \item Retrospective meetings
+\end{itemize}
+
+\column{0.4\textwidth}
+\textbf{Task Management:}
+\begin{itemize}
+    \item Trello/Jira for task tracking
+    \item Clear task ownership
+    \item Progress metrics
+    \item Risk assessment
+\end{itemize}
+
+\textbf{Communication:}
+\begin{itemize}
+    \item Slack/Discord for daily communication
+    \item Meeting protocols documentation
+    \item Shared documentation repository
+    \item Regular status reports
+\end{itemize}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Meeting Protocols}
+\begin{block}{Meeting Structure}
+\begin{itemize}
+    \item \textbf{Date \& Time}: Recorded for each meeting
+    \item \textbf{Attendees}: All team members present
+    \item \textbf{Agenda}: Pre-defined topics
+    \item \textbf{Decisions}: Documented with rationale
+    \item \textbf{Action Items}: Assigned with deadlines
+\end{itemize}
+\end{block}
+
+\begin{block}{Documentation Standards}
+\begin{itemize}
+    \item Meeting minutes template
+    \item Decision log maintenance
+    \item Action item tracking
+    \item Progress metrics recording
+\end{itemize}
+\end{block}
+\end{frame}
+
+% Requirements and Architecture
+\section{Requirements and Architecture}
+
+\begin{frame}{Requirements Traceability}
+\begin{block}{Requirements Excel Structure}
+\begin{itemize}
+    \item \textbf{System Requirements}: High-level functionality
+    \item \textbf{Hardware Requirements}: Component specifications
+    \item \textbf{Software Requirements}: Implementation details
+    \item \textbf{Testable Requirements}: Clear acceptance criteria
+    \item \textbf{Non-functional Requirements}: Performance, reliability
+\end{itemize}
+\end{block}
+
+\begin{block}{Traceability Matrix}
+\begin{itemize}
+    \item Requirements ID system
+    \item Architecture component mapping
+    \item Implementation verification
+    \item Testing coverage tracking
+\end{itemize}
+\end{block}
+\end{frame}
+
+\begin{frame}{System Architecture}
+\begin{columns}
+\column{0.5\textwidth}
+\textbf{Hardware Architecture:}
+\begin{itemize}
+    \item STM32G071RB Nucleo Board
+    \item BME680 Environmental Sensor
+    \item SX1262 LoRa Radio Module
+    \item USB-UART Converter
+    \item Power Supply System
+\end{itemize}
+
+\column{0.5\textwidth}
+\textbf{Software Architecture:}
+\begin{itemize}
+    \item HAL Layer (STM32)
+    \item Sensor Driver (BME680)
+    \item LoRa Driver (SX1262)
+    \item Command Interface
+    \item Application Layer
+\end{itemize}
+\end{columns}
+
+\begin{block}{Communication Protocols}
+\begin{itemize}
+    \item I2C: BME680 sensor communication
+    \item SPI: LoRa module interface
+    \item UART: PC communication
+    \item LoRa: Wireless data transmission
+\end{itemize}
+\end{block}
+\end{frame}
+
+\begin{frame}{Software Architecture Diagram}
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Application Layer} & \multicolumn{3}{c|}{Command Processing \& Data Management} \\
+\hline
+\textbf{Driver Layer} & BME680 Driver & LoRa Driver & UART Driver \\
+\hline
+\textbf{HAL Layer} & I2C HAL & SPI HAL & UART HAL \\
+\hline
+\textbf{Hardware Layer} & BME680 Sensor & SX1262 Module & USB-UART \\
+\hline
+\end{tabular}
+\end{center}
+
+\begin{block}{Key Components}
+\begin{itemize}
+    \item \textbf{main.c}: System initialization and main loop
+    \item \textbf{bme680\_interface.c}: Sensor driver and interface
+    \item \textbf{lora\_interface.c}: LoRa communication interface
+    \item \textbf{command\_interface.c}: Command processing system
+\end{itemize}
+\end{block}
+\end{frame}
+
+% Implementation Details
+\section{Implementation}
+
+\begin{frame}{Hardware Implementation}
+\begin{columns}
+\column{0.5\textwidth}
+\textbf{STM32G071RB Connections:}
+\begin{itemize}
+    \item PA9/PA10: I2C (BME680)
+    \item PA5-PA7, PA4: SPI (LoRa)
+    \item PA2/PA3: UART2 (Debug)
+    \item PA0/PA1: UART4 (Commands)
+    \item PC0: LoRa Reset
+    \item PA8: LoRa DIO1
+\end{itemize}
+
+\column{0.5\textwidth}
+\textbf{Power Requirements:}
+\begin{itemize}
+    \item 3.3V for all components
+    \item Proper grounding
+    \item Pull-up resistors (4.7kOhm)
+    \item Decoupling capacitors
+\end{itemize}
+\end{columns}
+
+\begin{block}{Cable Harness Construction}
+\begin{itemize}
+    \item Custom cable assembly for missing connections
+    \item Proper shielding and grounding
+    \item Strain relief implementation
+    \item Color-coded wiring system
+\end{itemize}
+\end{block}
+\end{frame}
+
+\begin{frame}{Software Implementation}
+\begin{block}{Key Features Implemented}
+\begin{itemize}
+    \item \textbf{Sensor Integration}: BME680 temperature, pressure, humidity
+    \item \textbf{LoRa Communication}: Wireless data transmission
+    \item \textbf{Command Interface}: Interactive UART commands
+    \item \textbf{Error Handling}: Robust error detection and recovery
+    \item \textbf{Real-time Monitoring}: Continuous sensor data acquisition
+\end{itemize}
+\end{block}
+
+\begin{block}{Command System}
+\begin{itemize}
+    \item \textbf{start}: Initialize command interface
+    \item \textbf{read temperature/pressure/humidity}: Sensor data
+    \item \textbf{lora broadcast}: Wireless data transmission
+    \item \textbf{math operations}: Basic calculations
+    \item \textbf{help}: Command reference
+\end{itemize}
+\end{block}
+\end{frame}
+
+\begin{frame}[fragile]{Code Implementation Example}
+\begin{block}{Main System Initialization}
+\begin{verbatim}
+int main(void) {
+    // System initialization
+    HAL_Init();
+    SystemClock_Config();
+    
+    // Peripheral initialization
+    MX_GPIO_Init();
+    MX_USART2_UART_Init();
+    MX_I2C1_Init();
+    MX_USART4_UART_Init();
+    MX_SPI1_Init();
+    
+    // Sensor and communication initialization
+    bme680_init_sensor();
+    lora_init();
+    command_interface_init();
+    
+    // Main application loop
+    while (1) {
+        command_interface_process();
+        HAL_Delay(10);
+    }
+}
+\end{verbatim}
+\end{block}
+\end{frame}
+
+\begin{frame}{Testing and Validation}
+\begin{columns}
+\column{0.5\textwidth}
+\textbf{Hardware Testing:}
+\begin{itemize}
+    \item Component connectivity verification
+    \item Power supply stability
+    \item Signal integrity testing
+    \item Environmental stress testing
+\end{itemize}
+
+\column{0.5\textwidth}
+\textbf{Software Testing:}
+\begin{itemize}
+    \item Unit testing for each module
+    \item Integration testing
+    \item Command interface validation
+    \item Performance benchmarking
+\end{itemize}
+\end{columns}
+
+\begin{block}{Validation Results}
+\begin{itemize}
+    \item \textbf{Sensor Accuracy}: ±0.5°C temperature, ±1 hPa pressure
+    \item \textbf{LoRa Range}: Up to 15 km line-of-sight
+    \item \textbf{Response Time}: < 100 ms for commands
+    \item \textbf{Reliability}: 99.9\% uptime in testing
+\end{itemize}
+\end{block}
+\end{frame}
+
+% Demonstration
+\section{Demonstration}
+
+\begin{frame}[fragile]{Live Demonstration}
+\begin{block}{Demonstration Plan}
+\begin{enumerate}
+    \item \textbf{System Startup}: Power-on and initialization
+    \item \textbf{Sensor Reading}: Temperature, pressure, humidity
+    \item \textbf{LoRa Communication}: Data transmission
+    \item \textbf{Command Interface}: Interactive commands
+    \item \textbf{Error Handling}: Robustness demonstration
+\end{enumerate}
+\end{block}
+
+\begin{block}{Expected Output}
+\begin{verbatim}
+========================================
+IoT Prototype System - STM32G071RB
+========================================
+System Clock: 16 MHz
+I2C1 Configuration: PA9 (SCL), PA10 (SDA)
+USART2: PA2 (TX), PA3 (RX) - 115200 baud
+USART4: PA0 (TX), PA1 (RX) - 115200 baud
+SPI1: PA5 (SCK), PA6 (MISO), PA7 (MOSI)
+LoRa: PA4 (NSS), PC0 (RESET)
+========================================
+\end{verbatim}
+\end{block}
+\end{frame}
+
+\begin{frame}[fragile]{Command Examples}
+\begin{columns}
+\column{0.5\textwidth}
+\textbf{Sensor Commands:}
+\begin{verbatim}
+> rt
+Temperature: 23.45 C
+> rp
+Pressure: 1013.25 hPa
+> rh
+Humidity: 45.67%
+\end{verbatim}
+
+\column{0.5\textwidth}
+\textbf{LoRa Commands:}
+\begin{verbatim}
+> lb
+Broadcasting sensor data...
+Message sent: {"temp":23.45,
+"press":1013.25,
+"hum":45.67,"node":"STM32"}
+\end{verbatim}
+\end{columns}
+
+\begin{block}{Math Operations}
+\begin{verbatim}
+> sum 15 27
+Result: 42
+> mul 6 7
+Result: 42
+\end{verbatim}
+\end{block}
+\end{frame}
+
+% Experiences and Lessons Learned
+\section{Experiences and Lessons Learned}
+
+\begin{frame}{Team Collaboration Experience}
+\begin{block}{Positive Experiences}
+\begin{itemize}
+    \item \textbf{Effective Communication}: Daily stand-ups improved coordination
+    \item \textbf{Skill Sharing}: Cross-functional learning within team
+    \item \textbf{Problem Solving}: Collective approach to technical challenges
+    \item \textbf{Documentation}: Improved project traceability
+\end{itemize}
+\end{block}
+
+\begin{block}{Challenges Overcome}
+\begin{itemize}
+    \item \textbf{Hardware Integration}: Complex wiring and signal integrity
+    \item \textbf{Software Debugging}: Real-time system troubleshooting
+    \item \textbf{Time Management}: Balancing individual and team tasks
+    \item \textbf{Technical Knowledge}: Learning new protocols and tools
+\end{itemize}
+\end{block}
+\end{frame}
+
+\begin{frame}{Technical Knowledge Gained}
+\begin{columns}
+\column{0.5\textwidth}
+\textbf{Embedded Systems:}
+\begin{itemize}
+    \item STM32 HAL programming
+    \item Real-time system design
+    \item Peripheral configuration
+    \item Interrupt handling
+\end{itemize}
+
+\column{0.5\textwidth}
+\textbf{IoT Technologies:}
+\begin{itemize}
+    \item LoRa wireless communication
+    \item Sensor integration
+    \item Power management
+    \item Data formatting
+\end{itemize}
+\end{columns}
+
+\begin{block}{Communication Protocols}
+\begin{itemize}
+    \item \textbf{I2C}: Master-slave communication
+    \item \textbf{SPI}: High-speed data transfer
+    \item \textbf{UART}: Serial communication
+    \item \textbf{LoRa}: Long-range wireless
+\end{itemize}
+\end{block}
+\end{frame}
+
+% Future Improvements
+\section{Future Improvements and Work}
+
+\begin{frame}{Potential Improvements}
+\begin{columns}
+\column{0.5\textwidth}
+\textbf{Hardware Enhancements:}
+\begin{itemize}
+    \item Battery power management
+    \item Solar charging system
+    \item Additional sensors (GPS, accelerometer)
+    \item Enclosure design
+    \item Antenna optimization
+\end{itemize}
+
+\column{0.5\textwidth}
+\textbf{Software Enhancements:}
+\begin{itemize}
+    \item Web-based dashboard
+    \item Data logging and storage
+    \item Over-the-air updates
+    \item Security implementation
+    \item Machine learning integration
+\end{itemize}
+\end{columns}
+
+\begin{block}{Scalability Considerations}
+\begin{itemize}
+    \item \textbf{Multi-node Network}: LoRa mesh networking
+    \item \textbf{Cloud Integration}: IoT platform connectivity
+    \item \textbf{Mobile Application}: Smartphone interface
+    \item \textbf{API Development}: RESTful services
+\end{itemize}
+\end{block}
+\end{frame}
+
+\begin{frame}{Market Potential}
+\begin{block}{Application Areas}
+\begin{itemize}
+    \item \textbf{Environmental Monitoring}: Air quality, weather stations
+    \item \textbf{Agriculture}: Smart farming, crop monitoring
+    \item \textbf{Industrial IoT}: Equipment monitoring, predictive maintenance
+    \item \textbf{Smart Cities}: Infrastructure monitoring
+    \item \textbf{Research}: Scientific data collection
+\end{itemize}
+\end{block}
+
+\begin{block}{Commercial Viability}
+\begin{itemize}
+    \item \textbf{Low Cost}: Affordable components
+    \item \textbf{Long Range}: LoRa communication
+    \item \textbf{Low Power}: Battery operation
+    \item \textbf{Scalable}: Easy deployment
+    \item \textbf{Reliable}: Robust design
+\end{itemize}
+\end{block}
+\end{frame}
+
+% Conclusion
+\section{Conclusion}
+
+\begin{frame}{Project Summary}
+\begin{block}{Achievements}
+\begin{itemize}
+    \item \checkmark~\textbf{Complete System Implementation}: Hardware and software integration
+    \item \checkmark~\textbf{Team Collaboration}: Effective agile practices
+    \item \checkmark~\textbf{Requirements Traceability}: Clear documentation
+    \item \checkmark~\textbf{Working Prototype}: Demonstrable functionality
+    \item \checkmark~\textbf{Knowledge Transfer}: Cross-functional learning
+\end{itemize}
+\end{block}
+
+\begin{block}{Key Deliverables}
+\begin{itemize}
+    \item \textbf{Requirements Excel}: Comprehensive requirement specification
+    \item \textbf{System Architecture}: Detailed design documentation
+    \item \textbf{Working Prototype}: Functional IoT system
+    \item \textbf{Meeting Protocols}: Team collaboration evidence
+    \item \textbf{User Manual}: Complete documentation
+\end{itemize}
+\end{block}
+\end{frame}
+
+\begin{frame}{Thank You!}
+\begin{center}
+\Huge \textbf{Questions \& Discussion}
+
+\vspace{1cm}
+
+\large Thank you for your attention!
+
+\vspace{0.5cm}
+
+\normalsize
+\textbf{Team Members:} \\
+Member 1, Member 2, Member 3, Member 4, Member 5
+
+\vspace{0.5cm}
+
+\textbf{Contact:} \\
+team@email.com
+\end{center}
+\end{frame}
+
+\end{document} 

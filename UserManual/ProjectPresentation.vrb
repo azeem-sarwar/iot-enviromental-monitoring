@@ -1,0 +1,32 @@
+\frametitle{Command Examples}
+\begin{columns}
+\column{0.5\textwidth}
+\textbf{Sensor Commands:}
+\begin{verbatim}
+> rt
+Temperature: 23.45 C
+> rp
+Pressure: 1013.25 hPa
+> rh
+Humidity: 45.67%
+\end{verbatim}
+
+\column{0.5\textwidth}
+\textbf{LoRa Commands:}
+\begin{verbatim}
+> lb
+Broadcasting sensor data...
+Message sent: {"temp":23.45,
+"press":1013.25,
+"hum":45.67,"node":"STM32"}
+\end{verbatim}
+\end{columns}
+
+\begin{block}{Math Operations}
+\begin{verbatim}
+> sum 15 27
+Result: 42
+> mul 6 7
+Result: 42
+\end{verbatim}
+\end{block}
