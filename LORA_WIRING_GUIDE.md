@@ -11,7 +11,7 @@ PA6 (MISO)        →    MISO (Data In)
 PA7 (MOSI)        →    MOSI (Data Out)
 PA4 (NSS/CS)      →    CEO (NSS/CS (Chip Select))
 PC0 (RESET)       →    IDSC (RESET )
-PC2 (DIO1)[digital input output]        →   P2 (DIO1 (Interrupt))  
+PC2 (DIO1)        →    P2 (DIO1 (Interrupt))  
 3.3V              →    VCC
 GND               →    GND
 ```
