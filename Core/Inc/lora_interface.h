@@ -28,6 +28,7 @@ int8_t lora_send_sensor_data(float temperature, float pressure, float humidity);
 int8_t lora_send_message(const uint8_t* data, uint8_t length);
 void lora_process_irq(void);
 int8_t lora_get_status(void);
+int8_t lora_force_redetect(void);
 void lora_print_config(void);
 int8_t lora_test_transmission(void);
 

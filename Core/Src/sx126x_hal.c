@@ -102,16 +102,18 @@ sx126x_hal_status_t sx126x_hal_write(const void* context, const uint8_t* command
     
     sx126x_hal_spi_select();
     
-    // Send command with shorter timeout
-    HAL_StatusTypeDef status = HAL_SPI_Transmit(hal_ctx.spi, (uint8_t*)command, command_length, 100);
+    // Send command with longer timeout for better reliability
+    HAL_StatusTypeDef status = HAL_SPI_Transmit(hal_ctx.spi, (uint8_t*)command, command_length, 500);
     
     // Send data if present
     if ((status == HAL_OK) && (data != NULL) && (data_length > 0)) {
-        status = HAL_SPI_Transmit(hal_ctx.spi, (uint8_t*)data, data_length, 100);
+        status = HAL_SPI_Transmit(hal_ctx.spi, (uint8_t*)data, data_length, 500);
     }
     
     sx126x_hal_spi_deselect();
     
+    // Additional check: if no device is connected, SPI might still return HAL_OK
+    // but the actual communication failed. We can't easily detect this at HAL level.
     return (status == HAL_OK) ? SX126X_HAL_STATUS_OK : SX126X_HAL_STATUS_ERROR;
 }
 
@@ -122,12 +124,12 @@ sx126x_hal_status_t sx126x_hal_read(const void* context, const uint8_t* command,
     
     sx126x_hal_spi_select();
     
-    // Send command with shorter timeout
-    HAL_StatusTypeDef status = HAL_SPI_Transmit(hal_ctx.spi, (uint8_t*)command, command_length, 100);
+    // Send command with longer timeout for better reliability
+    HAL_StatusTypeDef status = HAL_SPI_Transmit(hal_ctx.spi, (uint8_t*)command, command_length, 500);
     
     // Receive data if present
     if ((status == HAL_OK) && (data != NULL) && (data_length > 0)) {
-        status = HAL_SPI_Receive(hal_ctx.spi, data, data_length, 100);
+        status = HAL_SPI_Receive(hal_ctx.spi, data, data_length, 500);
     }
     
     sx126x_hal_spi_deselect();

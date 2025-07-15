@@ -204,6 +204,9 @@ void command_interface_handle_command(char* command)
     else if (strcmp(command, "lora rssi") == 0 || strcmp(command, "lr") == 0) {
         lora_get_rssi();
     }
+    else if (strcmp(command, "lora redetect") == 0 || strcmp(command, "lrd") == 0) {
+        lora_force_redetect();
+    }
     else if (strncmp(command, "sum ", 4) == 0) {
         cmd_math_operation(command);
     }
@@ -544,6 +547,9 @@ void command_interface_handle_command_usart4(char* command)
     }
     else if (strcmp(command, "lora rssi") == 0 || strcmp(command, "lr") == 0) {
         lora_get_rssi();
+    }
+    else if (strcmp(command, "lora redetect") == 0 || strcmp(command, "lrd") == 0) {
+        lora_force_redetect();
     }
     else if (strncmp(command, "sum ", 4) == 0) {
         cmd_math_operation_usart4(command);

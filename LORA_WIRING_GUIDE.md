@@ -9,9 +9,9 @@ STM32G071RB Pin    →    LoRa Module (SX126x) Pin
 PA5 (SCK)         →    SCK (Clock)
 PA6 (MISO)        →    MISO (Data In)
 PA7 (MOSI)        →    MOSI (Data Out)
-PA4 (NSS/CS)      →    CEO (NSS/CS (Chip Select))
-PC0 (RESET)       →    IDSC (RESET )
-PC2 (DIO1)        →    P2 (DIO1 (Interrupt))  
+PA4 (NSS/CS)      →    p40 (NSS/CS (Chip Select))
+PC0 (RESET)       →    p12 (RESET )
+PC2 (DIO1)        →    P36 (DIO1 (Interrupt))  
 3.3V              →    VCC
 GND               →    GND
 ```

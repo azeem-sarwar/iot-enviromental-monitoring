@@ -41,17 +41,54 @@ static int8_t lora_detect_module(void) {
     
     // Reset module first
     sx126x_reset(NULL);
+    HAL_Delay(50); // Give reset time to take effect
     
-    // Try to get chip status - this will fail if no module is present
+    // Test 1: Try to get chip status
     sx126x_status_t status = sx126x_get_status(NULL, &chip_status);
-    
-    if (status == SX126X_STATUS_OK) {
-        lora_module_detected = 1;
-        return 0;
-    } else {
+    if (status != SX126X_STATUS_OK) {
+        lora_debug_print("✗ LoRa detection failed: get_status returned error\r\n");
         lora_module_detected = 0;
         return -1;
     }
+    
+    // Test 2: Try to set standby mode
+    status = sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
+    if (status != SX126X_STATUS_OK) {
+        lora_debug_print("✗ LoRa detection failed: set_standby returned error\r\n");
+        lora_module_detected = 0;
+        return -1;
+    }
+    
+    // Test 3: Try to read a register (this is the most reliable test)
+    uint8_t test_buffer[1];
+    status = sx126x_read_register(NULL, 0x0000, test_buffer, 1);
+    if (status != SX126X_STATUS_OK) {
+        lora_debug_print("✗ LoRa detection failed: read_register returned error\r\n");
+        lora_module_detected = 0;
+        return -1;
+    }
+    
+    // Test 4: Try to set packet type (this requires actual chip response)
+    status = sx126x_set_pkt_type(NULL, SX126X_PKT_TYPE_LORA);
+    if (status != SX126X_STATUS_OK) {
+        lora_debug_print("✗ LoRa detection failed: set_pkt_type returned error\r\n");
+        lora_module_detected = 0;
+        return -1;
+    }
+    
+    // Test 5: Try to get packet type back (verifies the chip actually processed the command)
+    sx126x_pkt_type_t pkt_type;
+    status = sx126x_get_pkt_type(NULL, &pkt_type);
+    if (status != SX126X_STATUS_OK || pkt_type != SX126X_PKT_TYPE_LORA) {
+        lora_debug_print("✗ LoRa detection failed: get_pkt_type verification failed\r\n");
+        lora_module_detected = 0;
+        return -1;
+    }
+    
+    // All tests passed - module is definitely present
+    lora_module_detected = 1;
+    lora_debug_print("✓ LoRa module detected successfully\r\n");
+    return 0;
 }
 
 // Initialize LoRa module using real SX126x driver
@@ -288,6 +325,42 @@ int8_t lora_get_status(void) {
         lora_debug_print("LoRa Status: Error reading chip status\r\n");
         return -3;
     }
+}
+
+// Force re-detection of LoRa module
+int8_t lora_force_redetect(void) {
+    lora_debug_print("Forcing LoRa module re-detection...\r\n");
+    
+    // Reset detection flags
+    lora_module_detected = 0;
+    lora_initialized = 0;
+    
+    // Try to detect module
+    int8_t result = lora_detect_module();
+    
+    if (result == 0) {
+        lora_debug_print("✓ LoRa module detected and verified\r\n");
+        
+        // Additional verification: try to initialize
+        lora_debug_print("Testing full initialization...\r\n");
+        if (lora_init() == 0) {
+            lora_debug_print("✓ LoRa module fully functional\r\n");
+        } else {
+            lora_debug_print("✗ LoRa module detected but initialization failed\r\n");
+            lora_initialized = 0;
+        }
+    } else {
+        lora_debug_print("✗ LoRa module not detected - check wiring:\r\n");
+        lora_debug_print("  - PA5 (SCK) → LoRa SCK\r\n");
+        lora_debug_print("  - PA6 (MISO) → LoRa MISO\r\n");
+        lora_debug_print("  - PA7 (MOSI) → LoRa MOSI\r\n");
+        lora_debug_print("  - PA4 (NSS) → LoRa NSS\r\n");
+        lora_debug_print("  - PC0 (RESET) → LoRa RESET\r\n");
+        lora_debug_print("  - 3.3V → LoRa VCC\r\n");
+        lora_debug_print("  - GND → LoRa GND\r\n");
+    }
+    
+    return result;
 }
 
 // Print LoRa configuration
