@@ -34,7 +34,7 @@ Core/Src/lora_interface.o: ../Core/Src/lora_interface.c \
  ../Drivers/STM32G0xx_HAL_Driver/Inc/stm32g0xx_hal_uart.h \
  ../Drivers/STM32G0xx_HAL_Driver/Inc/stm32g0xx_hal_uart_ex.h \
  ../Core/Inc/bme680_interface.h ../Core/Inc/bme68x.h \
- ../Core/Inc/bme68x_defs.h ../Core/Inc/sx126x.h
+ ../Core/Inc/bme68x_defs.h
 ../Core/Inc/lora_interface.h:
 ../Drivers/STM32G0xx_HAL_Driver/Inc/stm32g0xx_hal.h:
 ../Core/Inc/stm32g0xx_hal_conf.h:
@@ -72,4 +72,3 @@ Core/Src/lora_interface.o: ../Core/Src/lora_interface.c \
 ../Core/Inc/bme680_interface.h:
 ../Core/Inc/bme68x.h:
 ../Core/Inc/bme68x_defs.h:
-../Core/Inc/sx126x.h:

@@ -69,7 +69,19 @@ void Error_Handler(void);
 #define TCK_GPIO_Port GPIOA
 
 /* USER CODE BEGIN Private defines */
-
+// SX1262 LoRa Module Pin Definitions
+#define SX1262_NSS_Pin GPIO_PIN_4
+#define SX1262_NSS_GPIO_Port GPIOA
+#define SX1262_SCK_Pin GPIO_PIN_5
+#define SX1262_SCK_GPIO_Port GPIOA
+#define SX1262_MISO_Pin GPIO_PIN_6
+#define SX1262_MISO_GPIO_Port GPIOA
+#define SX1262_MOSI_Pin GPIO_PIN_7
+#define SX1262_MOSI_GPIO_Port GPIOA
+#define SX1262_RESET_Pin GPIO_PIN_0
+#define SX1262_RESET_GPIO_Port GPIOC
+#define SX1262_BUSY_Pin GPIO_PIN_1
+#define SX1262_BUSY_GPIO_Port GPIOC
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

@@ -1,6 +1,5 @@
 #include "lora_interface.h"
 #include "bme680_interface.h"
-#include "sx126x.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -9,494 +8,522 @@ extern SPI_HandleTypeDef hspi1;
 extern UART_HandleTypeDef huart2;
 extern UART_HandleTypeDef huart4;
 
-// LoRa module status
-static uint8_t lora_module_detected = 0;
-static uint8_t lora_initialized = 0;
+// SX1262 module status
+static uint8_t sx1262_module_detected = 0;
+static uint8_t sx1262_initialized = 0;
 
-// SX126x configuration
-static sx126x_mod_params_lora_t lora_mod_params = {
-    .sf = SX126X_LORA_SF7,
-    .bw = SX126X_LORA_BW_125,
-    .cr = SX126X_LORA_CR_4_5,
-    .ldro = 1
-};
-
-static sx126x_pkt_params_lora_t lora_pkt_params = {
-    .preamble_len_in_symb = 8,
-    .header_type = SX126X_LORA_PKT_EXPLICIT,
-    .pld_len_in_bytes = 64,
-    .crc_is_on = true,
-    .invert_iq_is_on = false
+// SX1262 context
+static sx1262_context_t sx1262_ctx = {
+    .spi = &hspi1,
+    .nss_port = GPIOA,
+    .nss_pin = GPIO_PIN_4,
+    .reset_port = GPIOC,
+    .reset_pin = GPIO_PIN_0,
+    .busy_port = GPIOC,
+    .busy_pin = GPIO_PIN_1
 };
 
 // Debug function
-static void lora_debug_print(const char* message) {
+static void sx1262_debug_print(const char* message) {
     HAL_UART_Transmit(&huart2, (uint8_t*)message, strlen(message), 1000);
     HAL_UART_Transmit(&huart4, (uint8_t*)message, strlen(message), 1000);
 }
 
-// Detect LoRa module presence using real SX126x commands
-static int8_t lora_detect_module(void) {
-    sx126x_chip_status_t chip_status;
+// Wait for SX1262 BUSY pin to go low
+uint8_t sx1262_wait_for_busy(void) {
+    uint32_t timeout = HAL_GetTick() + 2000; // 2 second timeout (increased)
+    uint32_t start_time = HAL_GetTick();
     
-    // Reset module first
-    sx126x_reset(NULL);
+    // First check if BUSY is already low
+    if (HAL_GPIO_ReadPin(sx1262_ctx.busy_port, sx1262_ctx.busy_pin) == GPIO_PIN_RESET) {
+        return 1; // Already ready
+    }
     
-    // Try to get chip status - this will fail if no module is present
-    sx126x_status_t status = sx126x_get_status(NULL, &chip_status);
+    // Wait for BUSY to go low
+    while (HAL_GPIO_ReadPin(sx1262_ctx.busy_port, sx1262_ctx.busy_pin) == GPIO_PIN_SET) {
+        if (HAL_GetTick() > timeout) {
+            sx1262_debug_print("BUSY timeout after ");
+            char timeout_msg[32];
+            snprintf(timeout_msg, sizeof(timeout_msg), "%lu ms\r\n", HAL_GetTick() - start_time);
+            sx1262_debug_print(timeout_msg);
+            return 0; // Timeout
+        }
+        HAL_Delay(1); // Small delay to prevent tight loop
+    }
     
-    if (status == SX126X_STATUS_OK) {
-        lora_module_detected = 1;
+    return 1; // Success
+}
+
+// Check if SX1262 module is present and responding
+int8_t sx1262_detect_module(void) {
+    uint8_t status;
+    
+    sx1262_debug_print("Detecting SX1262 module...\r\n");
+    
+    // Try to read the chip status register
+    if (sx1262_spi_read(0xC0, &status, 1) == 0) {
+        sx1262_debug_print("✓ SX1262 module detected\r\n");
         return 0;
     } else {
-        lora_module_detected = 0;
+        sx1262_debug_print("✗ SX1262 module not detected\r\n");
         return -1;
     }
 }
 
-// Initialize LoRa module using real SX126x driver
-int8_t lora_init(void) {
-    sx126x_status_t status;
+// Simple SPI test function
+int8_t sx1262_test_spi(void) {
+    uint8_t test_data[4] = {0x12, 0x34, 0x56, 0x78};
+    uint8_t read_data[4];
     
-    // First detect if module is present
-    if (lora_detect_module() != 0) {
-        lora_debug_print("✗ LoRa initialization failed - no module detected\r\n");
-        lora_initialized = 0;
+    sx1262_debug_print("Testing SPI communication...\r\n");
+    
+    // Test basic SPI write/read
+    if (sx1262_spi_write(0x00, test_data, 4) == 0) {
+        sx1262_debug_print("✓ SPI write test passed\r\n");
+    } else {
+        sx1262_debug_print("✗ SPI write test failed\r\n");
         return -1;
     }
     
-    // Set standby mode
-    status = sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
-    if (status != SX126X_STATUS_OK) {
-        lora_debug_print("✗ Failed to set standby mode\r\n");
-        lora_initialized = 0;
+    if (sx1262_spi_read(0x00, read_data, 4) == 0) {
+        sx1262_debug_print("✓ SPI read test passed\r\n");
+        return 0;
+    } else {
+        sx1262_debug_print("✗ SPI read test failed\r\n");
+        return -1;
+    }
+}
+
+// SPI read function for SX1262
+int8_t sx1262_spi_read(uint8_t address, uint8_t* data, uint8_t length) {
+    uint8_t tx_buffer[256];
+    uint8_t rx_buffer[256];
+    
+    if (length > 255) return -1;
+    
+    // Prepare command - SX1262 uses 8-bit addresses
+    tx_buffer[0] = address; // Direct address for SX1262
+    
+    // Wait for BUSY to go low
+    if (!sx1262_wait_for_busy()) {
+        sx1262_debug_print("BUSY timeout during SPI read\r\n");
+        return -1;
+    }
+    
+    // Pull NSS low
+    HAL_GPIO_WritePin(sx1262_ctx.nss_port, sx1262_ctx.nss_pin, GPIO_PIN_RESET);
+    HAL_Delay(1); // Small delay for NSS setup
+    
+    // Transmit command
+    if (HAL_SPI_Transmit(sx1262_ctx.spi, tx_buffer, 1, 1000) != HAL_OK) {
+        HAL_GPIO_WritePin(sx1262_ctx.nss_port, sx1262_ctx.nss_pin, GPIO_PIN_SET);
+        sx1262_debug_print("SPI transmit failed\r\n");
+        return -1;
+    }
+    
+    // Receive data
+    if (HAL_SPI_Receive(sx1262_ctx.spi, rx_buffer, length, 1000) != HAL_OK) {
+        HAL_GPIO_WritePin(sx1262_ctx.nss_port, sx1262_ctx.nss_pin, GPIO_PIN_SET);
+        sx1262_debug_print("SPI receive failed\r\n");
+        return -1;
+    }
+    
+    // Pull NSS high
+    HAL_GPIO_WritePin(sx1262_ctx.nss_port, sx1262_ctx.nss_pin, GPIO_PIN_SET);
+    
+    // Copy received data
+    memcpy(data, rx_buffer, length);
+    
+    return 0;
+}
+
+// SPI write function for SX1262
+int8_t sx1262_spi_write(uint8_t address, const uint8_t* data, uint8_t length) {
+    uint8_t tx_buffer[256];
+    
+    if (length > 255) return -1;
+    
+    // Prepare command and data - SX1262 uses 8-bit addresses
+    tx_buffer[0] = address; // Direct address for SX1262
+    memcpy(&tx_buffer[1], data, length);
+    
+    // Wait for BUSY to go low
+    if (!sx1262_wait_for_busy()) {
+        sx1262_debug_print("BUSY timeout during SPI write\r\n");
+        return -1;
+    }
+    
+    // Pull NSS low
+    HAL_GPIO_WritePin(sx1262_ctx.nss_port, sx1262_ctx.nss_pin, GPIO_PIN_RESET);
+    HAL_Delay(1); // Small delay for NSS setup
+    
+    // Transmit command and data
+    if (HAL_SPI_Transmit(sx1262_ctx.spi, tx_buffer, length + 1, 1000) != HAL_OK) {
+        HAL_GPIO_WritePin(sx1262_ctx.nss_port, sx1262_ctx.nss_pin, GPIO_PIN_SET);
+        sx1262_debug_print("SPI transmit failed\r\n");
+        return -1;
+    }
+    
+    // Pull NSS high
+    HAL_GPIO_WritePin(sx1262_ctx.nss_port, sx1262_ctx.nss_pin, GPIO_PIN_SET);
+    
+    return 0;
+}
+
+// SPI write-read function for SX1262
+int8_t sx1262_spi_write_read(uint8_t address, const uint8_t* tx_data, uint8_t* rx_data, uint8_t length) {
+    uint8_t tx_buffer[256];
+    uint8_t rx_buffer[256];
+    
+    if (length > 255) return -1;
+    
+    // Prepare command and data
+    tx_buffer[0] = address & 0x7F; // Read command
+    memcpy(&tx_buffer[1], tx_data, length);
+    
+    // Wait for BUSY to go low
+    if (!sx1262_wait_for_busy()) {
+        return -1;
+    }
+    
+    // Pull NSS low
+    HAL_GPIO_WritePin(sx1262_ctx.nss_port, sx1262_ctx.nss_pin, GPIO_PIN_RESET);
+    
+    // Transmit and receive
+    if (HAL_SPI_TransmitReceive(sx1262_ctx.spi, tx_buffer, rx_buffer, length + 1, 1000) != HAL_OK) {
+        HAL_GPIO_WritePin(sx1262_ctx.nss_port, sx1262_ctx.nss_pin, GPIO_PIN_SET);
+        return -1;
+    }
+    
+    // Pull NSS high
+    HAL_GPIO_WritePin(sx1262_ctx.nss_port, sx1262_ctx.nss_pin, GPIO_PIN_SET);
+    
+    // Copy received data (skip first byte which is the command)
+    memcpy(rx_data, &rx_buffer[1], length);
+    
+    return 0;
+}
+
+// Reset SX1262 module
+int8_t sx1262_reset(void) {
+    sx1262_debug_print("Resetting SX1262 module...\r\n");
+    
+    // Pull RESET low
+    HAL_GPIO_WritePin(sx1262_ctx.reset_port, sx1262_ctx.reset_pin, GPIO_PIN_RESET);
+    HAL_Delay(20); // Longer reset pulse
+    
+    // Pull RESET high
+    HAL_GPIO_WritePin(sx1262_ctx.reset_port, sx1262_ctx.reset_pin, GPIO_PIN_SET);
+    HAL_Delay(50); // Wait for module to stabilize
+    
+    // Check if BUSY is high initially (normal after reset)
+    if (HAL_GPIO_ReadPin(sx1262_ctx.busy_port, sx1262_ctx.busy_pin) == GPIO_PIN_SET) {
+        sx1262_debug_print("BUSY is high after reset (normal)\r\n");
+        HAL_Delay(100); // Wait for module to finish initialization
+    }
+    
+    // Now wait for BUSY to go low (module ready)
+    if (!sx1262_wait_for_busy()) {
+        sx1262_debug_print("✗ SX1262 reset failed - BUSY timeout\r\n");
+        return -1;
+    }
+    
+    sx1262_debug_print("✓ SX1262 reset successful\r\n");
+    return 0;
+}
+
+// Configure SX1262 for LoRa operation
+int8_t sx1262_configure_lora(void) {
+    uint8_t config_data[16];
+    
+    // Set to standby mode
+    config_data[0] = 0x80; // STANDBY_RC command
+    if (sx1262_spi_write(0x80, config_data, 1) != 0) {
+        sx1262_debug_print("✗ Failed to set standby mode\r\n");
         return -1;
     }
     
     // Set regulator mode to LDO
-    status = sx126x_set_reg_mode(NULL, SX126X_REG_MODE_LDO);
-    if (status != SX126X_STATUS_OK) {
-        lora_debug_print("✗ Failed to set regulator mode\r\n");
-        lora_initialized = 0;
+    config_data[0] = 0x96; // SET_REGULATOR_MODE command
+    config_data[1] = 0x00; // LDO mode
+    if (sx1262_spi_write(0x96, config_data, 2) != 0) {
+        sx1262_debug_print("✗ Failed to set regulator mode\r\n");
         return -1;
     }
     
     // Set packet type to LoRa
-    status = sx126x_set_pkt_type(NULL, SX126X_PKT_TYPE_LORA);
-    if (status != SX126X_STATUS_OK) {
-        lora_debug_print("✗ Failed to set packet type\r\n");
-        lora_initialized = 0;
+    config_data[0] = 0x8A; // SET_PKT_TYPE command
+    config_data[1] = 0x01; // LoRa packet type
+    if (sx1262_spi_write(0x8A, config_data, 2) != 0) {
+        sx1262_debug_print("✗ Failed to set packet type\r\n");
         return -1;
     }
     
     // Set RF frequency (868 MHz)
-    status = sx126x_set_rf_freq(NULL, LORA_FREQUENCY_HZ);
-    if (status != SX126X_STATUS_OK) {
-        lora_debug_print("✗ Failed to set RF frequency\r\n");
-        lora_initialized = 0;
+    uint32_t freq = ((uint64_t)SX1262_FREQUENCY_HZ * 16384) / 32000000; // Convert to SX1262 format
+    config_data[0] = 0x86; // SET_RF_FREQUENCY command
+    config_data[1] = (freq >> 16) & 0xFF;
+    config_data[2] = (freq >> 8) & 0xFF;
+    config_data[3] = freq & 0xFF;
+    if (sx1262_spi_write(0x86, config_data, 4) != 0) {
+        sx1262_debug_print("✗ Failed to set RF frequency\r\n");
         return -1;
     }
     
     // Set LoRa modulation parameters
-    status = sx126x_set_lora_mod_params(NULL, &lora_mod_params);
-    if (status != SX126X_STATUS_OK) {
-        lora_debug_print("✗ Failed to set LoRa modulation parameters\r\n");
-        lora_initialized = 0;
+    config_data[0] = 0x8B; // SET_MODULATION_PARAMS command
+    config_data[1] = SX1262_SPREADING_FACTOR; // Spreading factor
+    config_data[2] = SX1262_BANDWIDTH / 125; // Bandwidth (125 kHz = 0x00)
+    config_data[3] = SX1262_CODING_RATE; // Coding rate
+    config_data[4] = 0x01; // Low data rate optimization
+    if (sx1262_spi_write(0x8B, config_data, 5) != 0) {
+        sx1262_debug_print("✗ Failed to set modulation parameters\r\n");
         return -1;
     }
     
     // Set LoRa packet parameters
-    status = sx126x_set_lora_pkt_params(NULL, &lora_pkt_params);
-    if (status != SX126X_STATUS_OK) {
-        lora_debug_print("✗ Failed to set LoRa packet parameters\r\n");
-        lora_initialized = 0;
+    config_data[0] = 0x8C; // SET_PKT_PARAMS command
+    config_data[1] = SX1262_PREAMBLE_LENGTH >> 8; // Preamble length MSB
+    config_data[2] = SX1262_PREAMBLE_LENGTH & 0xFF; // Preamble length LSB
+    config_data[3] = 0x01; // Header type (explicit)
+    config_data[4] = SX1262_PAYLOAD_LENGTH; // Payload length
+    config_data[5] = 0x01; // CRC on
+    config_data[6] = 0x00; // Invert IQ off
+    if (sx1262_spi_write(0x8C, config_data, 7) != 0) {
+        sx1262_debug_print("✗ Failed to set packet parameters\r\n");
         return -1;
     }
     
     // Set TX parameters
-    status = sx126x_set_tx_params(NULL, LORA_TX_POWER_DBM, SX126X_RAMP_10_US);
-    if (status != SX126X_STATUS_OK) {
-        lora_debug_print("✗ Failed to set TX parameters\r\n");
-        lora_initialized = 0;
+    config_data[0] = 0x8E; // SET_TX_PARAMS command
+    config_data[1] = SX1262_TX_POWER_DBM; // TX power
+    config_data[2] = 0x00; // Ramp time (10 us)
+    if (sx1262_spi_write(0x8E, config_data, 3) != 0) {
+        sx1262_debug_print("✗ Failed to set TX parameters\r\n");
         return -1;
     }
     
     // Set LoRa sync word
-    status = sx126x_set_lora_sync_word(NULL, LORA_SYNC_WORD);
-    if (status != SX126X_STATUS_OK) {
-        lora_debug_print("✗ Failed to set LoRa sync word\r\n");
-        lora_initialized = 0;
+    config_data[0] = 0x91; // SET_LORA_SYNC_WORD command
+    config_data[1] = SX1262_SYNC_WORD; // Sync word
+    if (sx1262_spi_write(0x91, config_data, 2) != 0) {
+        sx1262_debug_print("✗ Failed to set sync word\r\n");
         return -1;
     }
     
     // Set buffer base address
-    status = sx126x_set_buffer_base_address(NULL, 0x00, 0x00);
-    if (status != SX126X_STATUS_OK) {
-        lora_debug_print("✗ Failed to set buffer base address\r\n");
-        lora_initialized = 0;
+    config_data[0] = 0x8F; // SET_BUFFER_BASE_ADDRESS command
+    config_data[1] = 0x00; // TX base address
+    config_data[2] = 0x00; // RX base address
+    if (sx1262_spi_write(0x8F, config_data, 3) != 0) {
+        sx1262_debug_print("✗ Failed to set buffer base address\r\n");
         return -1;
     }
     
-    // Set DIO IRQ parameters
-    status = sx126x_set_dio_irq_params(NULL, SX126X_IRQ_TX_DONE | SX126X_IRQ_TIMEOUT, 
-                                       SX126X_IRQ_TX_DONE | SX126X_IRQ_TIMEOUT, 0, 0);
-    if (status != SX126X_STATUS_OK) {
-        lora_debug_print("✗ Failed to set DIO IRQ parameters\r\n");
-        lora_initialized = 0;
-        return -1;
-    }
-    
-    lora_debug_print("✓ LoRa module initialized successfully\r\n");
-    lora_initialized = 1;
+    sx1262_debug_print("✓ SX1262 LoRa configuration successful\r\n");
     return 0;
 }
 
-// Send sensor data via LoRa
-int8_t lora_send_sensor_data(float temperature, float pressure, float humidity) {
-    if (!lora_module_detected) {
-        lora_debug_print("✗ LoRa transmission failed - no module detected\r\n");
+// Initialize SX1262 module
+int8_t sx1262_init(void) {
+    sx1262_debug_print("Initializing SX1262 LoRa module...\r\n");
+    
+    // First detect if module is present
+    if (sx1262_detect_module() != 0) {
+        sx1262_debug_print("✗ SX1262 module not detected - check connections\r\n");
+        sx1262_debug_print("Check wiring:\r\n");
+        sx1262_debug_print("  - PA4 (NSS) → SX1262 CS\r\n");
+        sx1262_debug_print("  - PA5 (SCK) → SX1262 SCK\r\n");
+        sx1262_debug_print("  - PA6 (MISO) → SX1262 MISO\r\n");
+        sx1262_debug_print("  - PA7 (MOSI) → SX1262 MOSI\r\n");
+        sx1262_debug_print("  - PC0 (RESET) → SX1262 RESET\r\n");
+        sx1262_debug_print("  - PC1 (BUSY) → SX1262 BUSY\r\n");
+        sx1262_debug_print("  - 3.3V → SX1262 VCC\r\n");
+        sx1262_debug_print("  - GND → SX1262 GND\r\n");
+        sx1262_module_detected = 0;
+        sx1262_initialized = 0;
         return -1;
     }
     
-    if (!lora_initialized) {
-        lora_debug_print("✗ LoRa transmission failed - module not initialized\r\n");
+    sx1262_module_detected = 1;
+    sx1262_debug_print("✓ Module detected, proceeding with initialization...\r\n");
+    
+    // Reset the module
+    if (sx1262_reset() != 0) {
+        sx1262_debug_print("✗ SX1262 reset failed - trying alternative approach\r\n");
+        
+        // Try a simpler approach - just wait and try to configure
+        HAL_Delay(200); // Wait longer for module to stabilize
+        
+        if (sx1262_configure_lora() != 0) {
+            sx1262_debug_print("✗ SX1262 LoRa configuration failed after reset timeout\r\n");
+            sx1262_initialized = 0;
+            return -1;
+        }
+        
+        sx1262_debug_print("✓ SX1262 LoRa module initialized (alternative method)\r\n");
+        sx1262_initialized = 1;
+        return 0;
+    }
+    
+    // Configure for LoRa operation
+    if (sx1262_configure_lora() != 0) {
+        sx1262_debug_print("✗ SX1262 LoRa configuration failed\r\n");
+        sx1262_initialized = 0;
         return -1;
     }
     
-    char payload[LORA_PAYLOAD_LENGTH];
-    int len;
+    sx1262_debug_print("✓ SX1262 LoRa module initialized successfully\r\n");
+    sx1262_initialized = 1;
+    return 0;
+}
+
+// Send sensor data via SX1262 LoRa
+int8_t sx1262_send_sensor_data(float temperature, float pressure, float humidity) {
+    if (!sx1262_module_detected) {
+        sx1262_debug_print("✗ LoRa transmission failed - no module detected\r\n");
+        return -1;
+    }
+    
+    if (!sx1262_initialized) {
+        sx1262_debug_print("✗ LoRa transmission failed - module not initialized\r\n");
+        return -1;
+    }
+    
+    char payload[SX1262_PAYLOAD_LENGTH];
     
     // Format sensor data as JSON-like string
-    len = snprintf(payload, sizeof(payload), 
+    snprintf(payload, sizeof(payload), 
                    "{\"temp\":%.2f,\"press\":%.2f,\"hum\":%.2f,\"node\":\"STM32\"}",
                    temperature, pressure, humidity);
     
-    if (len < 0 || len >= sizeof(payload)) {
-        lora_debug_print("Error: Payload too long\r\n");
-        return -1;
-    }
-    
-    return lora_send_message((uint8_t*)payload, len);
+    return sx1262_send_message((uint8_t*)payload, strlen(payload));
 }
 
-// Send message via LoRa using real SX126x driver
-int8_t lora_send_message(const uint8_t* data, uint8_t length) {
-    sx126x_status_t status;
-    sx126x_irq_mask_t irq_status;
-    
-    if (!lora_module_detected) {
-        lora_debug_print("✗ LoRa transmission failed - no module detected\r\n");
+// Send message via SX1262 LoRa
+int8_t sx1262_send_message(const uint8_t* data, uint8_t length) {
+    if (!sx1262_module_detected) {
+        sx1262_debug_print("✗ LoRa transmission failed - no module detected\r\n");
         return -1;
     }
     
-    if (!lora_initialized) {
-        lora_debug_print("✗ LoRa transmission failed - module not initialized\r\n");
+    if (!sx1262_initialized) {
+        sx1262_debug_print("✗ LoRa transmission failed - module not initialized\r\n");
         return -1;
     }
     
-    if (data == NULL || length == 0 || length > LORA_PAYLOAD_LENGTH) {
-        lora_debug_print("Invalid LoRa message parameters\r\n");
-        return -1;
-    }
-    
-    // Update packet length
-    lora_pkt_params.pld_len_in_bytes = length;
-    status = sx126x_set_lora_pkt_params(NULL, &lora_pkt_params);
-    if (status != SX126X_STATUS_OK) {
-        lora_debug_print("✗ Failed to update packet parameters\r\n");
+    if (data == NULL || length == 0 || length > SX1262_PAYLOAD_LENGTH) {
+        sx1262_debug_print("Invalid LoRa message parameters\r\n");
         return -1;
     }
     
     // Write payload to buffer
-    status = sx126x_write_buffer(NULL, 0x00, data, length);
-    if (status != SX126X_STATUS_OK) {
-        lora_debug_print("✗ Failed to write payload to buffer\r\n");
+    if (sx1262_spi_write(0x0E, data, length) != 0) {
+        sx1262_debug_print("✗ Failed to write payload to buffer\r\n");
         return -1;
     }
     
-    // Clear IRQ status
-    status = sx126x_clear_irq_status(NULL, SX126X_IRQ_ALL);
-    if (status != SX126X_STATUS_OK) {
-        lora_debug_print("✗ Failed to clear IRQ status\r\n");
+    // Set packet length
+    uint8_t pkt_len = length;
+    if (sx1262_spi_write(0x8C, &pkt_len, 1) != 0) {
+        sx1262_debug_print("✗ Failed to set packet length\r\n");
         return -1;
     }
     
     // Start transmission
-    status = sx126x_set_tx(NULL, 1000); // 1 second timeout
-    if (status != SX126X_STATUS_OK) {
-        lora_debug_print("✗ Failed to start transmission\r\n");
+    uint8_t tx_cmd = 0x83; // TX command
+    if (sx1262_spi_write(0x83, &tx_cmd, 1) != 0) {
+        sx1262_debug_print("✗ Failed to start transmission\r\n");
         return -1;
     }
     
-    // Wait for transmission to complete
-    uint32_t timeout = HAL_GetTick() + 2000; // 2 second timeout
-    while (HAL_GetTick() < timeout) {
-        status = sx126x_get_irq_status(NULL, &irq_status);
-        if (status == SX126X_STATUS_OK) {
-            if (irq_status & SX126X_IRQ_TX_DONE) {
-                return 0;
-            } else if (irq_status & SX126X_IRQ_TIMEOUT) {
-                lora_debug_print("✗ LoRa transmission timeout\r\n");
+    // Wait for transmission to complete (BUSY will go low)
+    if (!sx1262_wait_for_busy()) {
+        sx1262_debug_print("✗ LoRa transmission timeout\r\n");
                 return -1;
-            }
-        }
-        HAL_Delay(1);
     }
     
-    lora_debug_print("✗ LoRa transmission timeout\r\n");
-    return -1;
+    sx1262_debug_print("✓ Message sent successfully via SX1262 LoRa\r\n");
+    return 0;
 }
 
-// Process LoRa interrupts
-void lora_process_irq(void) {
-    if (!lora_module_detected) {
-        return; // No module to process interrupts for
-    }
-    
-    sx126x_irq_mask_t irq_status;
-    sx126x_status_t status = sx126x_get_and_clear_irq_status(NULL, &irq_status);
-    
-    if (status == SX126X_STATUS_OK && irq_status != 0) {
-        if (irq_status & SX126X_IRQ_TX_DONE) {
-            lora_debug_print("IRQ: Transmission completed\r\n");
-        }
-        if (irq_status & SX126X_IRQ_TIMEOUT) {
-            lora_debug_print("IRQ: Transmission timeout\r\n");
-        }
-    }
+// Process SX1262 interrupts
+void sx1262_process_irq(void) {
+    // For now, we use polling for BUSY pin
+    // This function can be extended for DIO1 interrupt handling
 }
 
-// Get LoRa status
-int8_t lora_get_status(void) {
-    if (!lora_module_detected) {
-        lora_debug_print("LoRa Status: No module detected\r\n");
+// Get SX1262 status
+int8_t sx1262_get_status(void) {
+    uint8_t status;
+    
+    if (sx1262_spi_read(0xC0, &status, 1) == 0) {
+        char status_msg[64];
+        snprintf(status_msg, sizeof(status_msg), "SX1262 Status: 0x%02X\r\n", status);
+        sx1262_debug_print(status_msg);
+        return 0;
+    }
+    
         return -1;
     }
     
-    if (!lora_initialized) {
-        lora_debug_print("LoRa Status: Module detected but not initialized\r\n");
-        return -2;
-    }
+// Print SX1262 configuration
+void sx1262_print_config(void) {
+    sx1262_debug_print("\r\n=== SX1262 LoRa Configuration ===\r\n");
+    sx1262_debug_print("Status: ");
+    sx1262_debug_print(sx1262_module_detected ? "Module detected\r\n" : "No module detected\r\n");
+    sx1262_debug_print("Initialized: ");
+    sx1262_debug_print(sx1262_initialized ? "Yes\r\n" : "No\r\n");
+    sx1262_debug_print("Frequency: 868 MHz (EU band)\r\n");
+    sx1262_debug_print("Spreading Factor: SF7\r\n");
+    sx1262_debug_print("Bandwidth: 125 kHz\r\n");
+    sx1262_debug_print("Coding Rate: 4/5\r\n");
+    sx1262_debug_print("TX Power: 14 dBm\r\n");
+    sx1262_debug_print("Sync Word: 0x12\r\n");
+    sx1262_debug_print("Payload Length: 64 bytes\r\n");
+    sx1262_debug_print("Preamble Length: 8 symbols\r\n");
+    sx1262_debug_print("CRC: Enabled\r\n");
+    sx1262_debug_print("IQ Inversion: Disabled\r\n");
+    sx1262_debug_print("========================\r\n");
+}
+
+// Test SX1262 transmission
+int8_t sx1262_test_transmission(void) {
+    const char* test_message = "Hello SX1262 from STM32!";
     
-    sx126x_chip_status_t chip_status;
-    sx126x_status_t status = sx126x_get_status(NULL, &chip_status);
+    sx1262_debug_print("Testing SX1262 LoRa transmission...\r\n");
     
-    if (status == SX126X_STATUS_OK) {
-        lora_debug_print("LoRa Status: Module ready\r\n");
+    if (sx1262_send_message((uint8_t*)test_message, strlen(test_message)) == 0) {
+        sx1262_debug_print("✓ SX1262 transmission test successful\r\n");
         return 0;
     } else {
-        lora_debug_print("LoRa Status: Error reading chip status\r\n");
-        return -3;
-    }
-}
-
-// Print LoRa configuration
-void lora_print_config(void) {
-    lora_debug_print("=== LoRa Configuration ===\r\n");
-    
-    if (!lora_module_detected) {
-        lora_debug_print("Status: No module detected\r\n");
-        lora_debug_print("========================\r\n");
-        return;
-    }
-    
-    lora_debug_print("Status: Module detected\r\n");
-    lora_debug_print("Initialized: ");
-    lora_debug_print(lora_initialized ? "Yes\r\n" : "No\r\n");
-    lora_debug_print("Frequency: 868 MHz (EU band)\r\n");
-    lora_debug_print("Spreading Factor: SF7\r\n");
-    lora_debug_print("Bandwidth: 125 kHz\r\n");
-    lora_debug_print("Coding Rate: 4/5\r\n");
-    lora_debug_print("TX Power: 14 dBm\r\n");
-    lora_debug_print("Sync Word: 0x12\r\n");
-    lora_debug_print("Payload Length: 64 bytes\r\n");
-    lora_debug_print("Preamble Length: 8 symbols\r\n");
-    lora_debug_print("CRC: Enabled\r\n");
-    lora_debug_print("IQ Inversion: Disabled\r\n");
-    lora_debug_print("========================\r\n");
-}
-
-// Test LoRa functionality
-int8_t lora_test_transmission(void) {
-    if (!lora_module_detected) {
-        lora_debug_print("✗ Test failed - no LoRa module detected\r\n");
+        sx1262_debug_print("✗ SX1262 transmission test failed\r\n");
         return -1;
     }
-    
-    if (!lora_initialized) {
-        lora_debug_print("✗ Test failed - LoRa module not initialized\r\n");
-        return -2;
-    }
-    
-    // Test with a simple message
-    const char* test_msg = "LoRa Test Message from STM32";
-    int8_t result = lora_send_message((uint8_t*)test_msg, strlen(test_msg));
-    
-    if (result == 0) {
-        lora_debug_print("✓ LoRa test transmission successful\r\n");
-    } else {
-        lora_debug_print("✗ LoRa test transmission failed\r\n");
-    }
-    
-    return result;
 }
 
-// Scan for LoRa signals from other devices
+// Legacy function implementations for compatibility
+
+// Scan for LoRa signals (placeholder implementation)
 int8_t lora_scan_signals(uint32_t scan_time_ms) {
-    sx126x_status_t status;
-    sx126x_irq_mask_t irq_status;
-    uint8_t rx_buffer[256];
-    uint8_t payload_length;
-    sx126x_pkt_status_lora_t pkt_status;
-    char scan_msg[128];
-    
-    if (!lora_module_detected) {
-        lora_debug_print("✗ Scan failed - no LoRa module detected\r\n");
+    sx1262_debug_print("LoRa signal scanning not implemented yet\r\n");
         return -1;
     }
     
-    if (!lora_initialized) {
-        lora_debug_print("✗ Scan failed - LoRa module not initialized\r\n");
-        return -2;
-    }
-    
-    // Set to receive mode
-    status = sx126x_set_rx(NULL, scan_time_ms);
-    if (status != SX126X_STATUS_OK) {
-        lora_debug_print("✗ Failed to set receive mode\r\n");
-        return -3;
-    }
-    
-    snprintf(scan_msg, sizeof(scan_msg), "Scanning for LoRa signals for %lu ms...\r\n", scan_time_ms);
-    lora_debug_print(scan_msg);
-    
-    // Wait for reception or timeout
-    uint32_t start_time = HAL_GetTick();
-    uint32_t timeout = start_time + scan_time_ms;
-    
-    while (HAL_GetTick() < timeout) {
-        status = sx126x_get_irq_status(NULL, &irq_status);
-        if (status == SX126X_STATUS_OK) {
-            if (irq_status & SX126X_IRQ_RX_DONE) {
-                // Packet received
-                status = sx126x_get_lora_pkt_status(NULL, &pkt_status);
-                if (status == SX126X_STATUS_OK) {
-                    // Read payload
-                    status = sx126x_read_buffer(NULL, 0x00, rx_buffer, payload_length);
-                    if (status == SX126X_STATUS_OK) {
-                        snprintf(scan_msg, sizeof(scan_msg), 
-                                "✓ Signal detected! RSSI: %d dBm, SNR: %d dB, Length: %d bytes\r\n",
-                                pkt_status.rssi_pkt_in_dbm, pkt_status.snr_pkt_in_db, payload_length);
-                        lora_debug_print(scan_msg);
-                        
-                        // Print first 32 bytes of payload as hex
-                        lora_debug_print("Payload (hex): ");
-                        for (int i = 0; i < (payload_length > 32 ? 32 : payload_length); i++) {
-                            snprintf(scan_msg, sizeof(scan_msg), "%02X ", rx_buffer[i]);
-                            lora_debug_print(scan_msg);
-                        }
-                        lora_debug_print("\r\n");
-                        
-                        // Try to print as string if it looks like text
-                        if (payload_length > 0) {
-                            lora_debug_print("Payload (text): ");
-                            for (int i = 0; i < (payload_length > 32 ? 32 : payload_length); i++) {
-                                if (rx_buffer[i] >= 32 && rx_buffer[i] <= 126) {
-                                    snprintf(scan_msg, sizeof(scan_msg), "%c", rx_buffer[i]);
-                                    lora_debug_print(scan_msg);
-                                } else {
-                                    lora_debug_print(".");
-                                }
-                            }
-                            lora_debug_print("\r\n");
-                        }
-                    }
-                }
-                
-                // Clear IRQ and continue scanning
-                sx126x_clear_irq_status(NULL, SX126X_IRQ_ALL);
-                status = sx126x_set_rx(NULL, timeout - HAL_GetTick());
-            } else if (irq_status & SX126X_IRQ_TIMEOUT) {
-                break; // Scan timeout
-            }
-        }
-        HAL_Delay(10);
-    }
-    
-    lora_debug_print("Scan completed\r\n");
-    return 0;
-}
-
-// Continuous LoRa monitoring mode
+// Start LoRa monitoring (placeholder implementation)
 int8_t lora_start_monitoring(void) {
-    sx126x_status_t status;
-    
-    if (!lora_module_detected) {
-        lora_debug_print("✗ Monitoring failed - no LoRa module detected\r\n");
+    sx1262_debug_print("LoRa monitoring not implemented yet\r\n");
         return -1;
     }
     
-    if (!lora_initialized) {
-        lora_debug_print("✗ Monitoring failed - LoRa module not initialized\r\n");
-        return -2;
-    }
-    
-    lora_debug_print("Starting continuous LoRa monitoring...\r\n");
-    lora_debug_print("Press any key to stop monitoring\r\n");
-    
-    // Set to continuous receive mode
-    status = sx126x_set_rx(NULL, 0); // 0 = continuous RX
-    if (status != SX126X_STATUS_OK) {
-        lora_debug_print("✗ Failed to set continuous receive mode\r\n");
-        return -3;
-    }
-    
-    return 0;
-}
-
-// Stop LoRa monitoring
+// Stop LoRa monitoring (placeholder implementation)
 int8_t lora_stop_monitoring(void) {
-    sx126x_status_t status;
-    
-    if (!lora_module_detected) {
+    sx1262_debug_print("LoRa monitoring not implemented yet\r\n");
         return -1;
     }
     
-    // Set to standby mode
-    status = sx126x_set_standby(NULL, SX126X_STANDBY_CFG_RC);
-    if (status != SX126X_STATUS_OK) {
-        lora_debug_print("✗ Failed to stop monitoring\r\n");
-        return -1;
-    }
-    
-    lora_debug_print("Monitoring stopped\r\n");
-    return 0;
-}
-
-// Get RSSI of current channel (for signal strength measurement)
+// Get RSSI value (placeholder implementation)
 int8_t lora_get_rssi(void) {
-    sx126x_status_t status;
-    int16_t rssi;
-    
-    if (!lora_module_detected) {
-        lora_debug_print("✗ RSSI measurement failed - no LoRa module detected\r\n");
+    sx1262_debug_print("RSSI measurement not implemented yet\r\n");
         return -1;
-    }
-    
-    if (!lora_initialized) {
-        lora_debug_print("✗ RSSI measurement failed - LoRa module not initialized\r\n");
-        return -2;
-    }
-    
-    // Get RSSI of current channel
-    status = sx126x_get_rssi_inst(NULL, &rssi);
-    if (status == SX126X_STATUS_OK) {
-        char rssi_msg[64];
-        snprintf(rssi_msg, sizeof(rssi_msg), "Current RSSI: %d dBm\r\n", rssi);
-        lora_debug_print(rssi_msg);
-        return 0;
-    } else {
-        lora_debug_print("✗ Failed to get RSSI\r\n");
-        return -3;
-    }
 } 

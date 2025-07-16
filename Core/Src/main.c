@@ -110,10 +110,11 @@ int main(void)
   command_interface_send_response("========================================\r\n");
   command_interface_send_response("System Clock: 16 MHz\r\n");
   command_interface_send_response("I2C1 Configuration: PA9 (SCL), PA10 (SDA)\r\n");
+  command_interface_send_response("USART1: PC4 (TX), PC5 (RX) - 115200 baud\r\n");
   command_interface_send_response("USART2: PA2 (TX), PA3 (RX) - 115200 baud\r\n");
   command_interface_send_response("USART4: PA0 (TX), PA1 (RX) - 115200 baud\r\n");
-  command_interface_send_response("SPI1: PA5 (SCK), PA6 (MISO), PA7 (MOSI)\r\n");
-  command_interface_send_response("LoRa: PA4 (NSS), PC0 (RESET)\r\n");
+  command_interface_send_response("SPI1: PA5 (SCK), PA6 (MISO), PA7 (MOSI), PA4 (NSS)\r\n");
+  command_interface_send_response("SX1262 LoRa: PA4 (NSS), PC0 (RESET), PC1 (BUSY)\r\n");
   command_interface_send_response("LED Status: PA5\r\n");
   command_interface_send_response("========================================\r\n");
   
@@ -122,10 +123,11 @@ int main(void)
   command_interface_send_response_usart4("========================================\r\n");
   command_interface_send_response_usart4("System Clock: 16 MHz\r\n");
   command_interface_send_response_usart4("I2C1 Configuration: PA9 (SCL), PA10 (SDA)\r\n");
+  command_interface_send_response_usart4("USART1: PC4 (TX), PC5 (RX) - 115200 baud\r\n");
   command_interface_send_response_usart4("USART2: PA2 (TX), PA3 (RX) - 115200 baud\r\n");
   command_interface_send_response_usart4("USART4: PA0 (TX), PA1 (RX) - 115200 baud\r\n");
-  command_interface_send_response_usart4("SPI1: PA5 (SCK), PA6 (MISO), PA7 (MOSI)\r\n");
-  command_interface_send_response_usart4("LoRa: PA4 (NSS), PC0 (RESET)\r\n");
+  command_interface_send_response_usart4("SPI1: PA5 (SCK), PA6 (MISO), PA7 (MOSI), PA4 (NSS)\r\n");
+  command_interface_send_response_usart4("SX1262 LoRa: PA4 (NSS), PC0 (RESET), PC1 (BUSY)\r\n");
   command_interface_send_response_usart4("LED Status: PA5\r\n");
   command_interface_send_response_usart4("========================================\r\n");
   
@@ -232,7 +234,7 @@ int main(void)
     /* USER CODE BEGIN 3 */
     // Process command interface
     command_interface_process();
-    
+
     // Toggle LED to show system is running
     HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
     
@@ -352,14 +354,14 @@ static void MX_SPI1_Init(void)
   hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi1.Init.NSS = SPI_NSS_SOFT;
+  hspi1.Init.NSS = SPI_NSS_HARD_OUTPUT;
   hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
   hspi1.Init.CRCPolynomial = 7;
   hspi1.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
-  hspi1.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
+  hspi1.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
   if (HAL_SPI_Init(&hspi1) != HAL_OK)
   {
     Error_Handler();
@@ -472,44 +474,23 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); // LoRa NSS high initially
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : PC0 PC1 PC2 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2;
+  /*Configure GPIO pin : PC0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure LoRa NSS pin (PA4) */
-  GPIO_InitStruct.Pin = GPIO_PIN_4;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-  
-  /*Configure LoRa DIO1 pin (PC1) for interrupts */
+  /*Configure GPIO pin : PC1 */
   GPIO_InitStruct.Pin = GPIO_PIN_1;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-  
-  /* Enable EXTI interrupt for DIO1 */
-  HAL_NVIC_SetPriority(EXTI0_1_IRQn, 2, 0);
-  HAL_NVIC_EnableIRQ(EXTI0_1_IRQn);;
-  
-  /*Configure SPI1 pins: PA5 (SCK), PA6 (MISO), PA7 (MOSI) */
-  GPIO_InitStruct.Pin = GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  GPIO_InitStruct.Alternate = GPIO_AF0_SPI1;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
-
+  /* PC1 is configured for SX1262 BUSY pin input */
   /* USER CODE END MX_GPIO_Init_2 */
 }
 

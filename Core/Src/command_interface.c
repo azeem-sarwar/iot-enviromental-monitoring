@@ -123,13 +123,15 @@ void command_interface_show_help(void)
     command_interface_send_response("  calib data (cd)       - Check BME680 calibration data\r\n");
     command_interface_send_response("  scan i2c (si)         - Scan I2C bus for devices\r\n");
     command_interface_send_response("\r\nLoRa Commands:\r\n");
-    command_interface_send_response("  lora broadcast (lb)   - Broadcast sensor data via LoRa\r\n");
-    command_interface_send_response("  lora config (lc)      - Show LoRa configuration\r\n");
-    command_interface_send_response("  lora test (lt)        - Test LoRa transmission\r\n");
+    command_interface_send_response("  lora broadcast (lb)   - Broadcast sensor data via SX1262 LoRa\r\n");
+    command_interface_send_response("  lora config (lc)      - Show SX1262 LoRa configuration\r\n");
+    command_interface_send_response("  lora test (lt)        - Test SX1262 LoRa transmission\r\n");
     command_interface_send_response("  lora scan (ls)        - Scan for LoRa signals (5s)\r\n");
     command_interface_send_response("  lora monitor (lm)     - Start continuous monitoring\r\n");
     command_interface_send_response("  lora stop (lst)       - Stop LoRa monitoring\r\n");
     command_interface_send_response("  lora rssi (lr)        - Get current RSSI\r\n");
+    command_interface_send_response("  test spi (tspi)       - Test SPI communication\r\n");
+    command_interface_send_response("  test lora (tl)        - Test LoRa module initialization\r\n");
     command_interface_send_response("\r\nMath Operations:\r\n");
     command_interface_send_response("  sum <num1> <num2>     - Add two numbers\r\n");
     command_interface_send_response("  sub <num1> <num2>     - Subtract num2 from num1\r\n");
@@ -203,6 +205,12 @@ void command_interface_handle_command(char* command)
     }
     else if (strcmp(command, "lora rssi") == 0 || strcmp(command, "lr") == 0) {
         lora_get_rssi();
+    }
+    else if (strcmp(command, "test spi") == 0 || strcmp(command, "tspi") == 0) {
+        cmd_test_spi();
+    }
+    else if (strcmp(command, "test lora") == 0 || strcmp(command, "tl") == 0) {
+        cmd_test_lora_init();
     }
     else if (strncmp(command, "sum ", 4) == 0) {
         cmd_math_operation(command);
@@ -468,9 +476,15 @@ void command_interface_show_help_usart4(void)
     command_interface_send_response_usart4("  raw adc (ra)          - Read raw BME680 ADC values\r\n");
     command_interface_send_response_usart4("  calib data (cd)       - Check BME680 calibration data\r\n");
     command_interface_send_response_usart4("  scan i2c (si)         - Scan I2C bus for devices\r\n");
-    command_interface_send_response_usart4("  lora broadcast (lb)   - Broadcast sensor data via LoRa\r\n");
-    command_interface_send_response_usart4("  lora config (lc)      - Show LoRa configuration\r\n");
-    command_interface_send_response_usart4("  lora test (lt)        - Test LoRa transmission\r\n");
+    command_interface_send_response_usart4("  lora broadcast (lb)   - Broadcast sensor data via SX1262 LoRa\r\n");
+    command_interface_send_response_usart4("  lora config (lc)      - Show SX1262 LoRa configuration\r\n");
+    command_interface_send_response_usart4("  lora test (lt)        - Test SX1262 LoRa transmission\r\n");
+    command_interface_send_response_usart4("  lora scan (ls)        - Scan for LoRa signals (5s)\r\n");
+    command_interface_send_response_usart4("  lora monitor (lm)     - Start continuous monitoring\r\n");
+    command_interface_send_response_usart4("  lora stop (lst)       - Stop LoRa monitoring\r\n");
+    command_interface_send_response_usart4("  lora rssi (lr)        - Get current RSSI\r\n");
+    command_interface_send_response_usart4("  test spi (tspi)       - Test SPI communication\r\n");
+    command_interface_send_response_usart4("  test lora (tl)        - Test LoRa module initialization\r\n");
     command_interface_send_response_usart4("\r\nMath Operations:\r\n");
     command_interface_send_response_usart4("  sum <num1> <num2>     - Add two numbers\r\n");
     command_interface_send_response_usart4("  sub <num1> <num2>     - Subtract num2 from num1\r\n");
@@ -544,6 +558,12 @@ void command_interface_handle_command_usart4(char* command)
     }
     else if (strcmp(command, "lora rssi") == 0 || strcmp(command, "lr") == 0) {
         lora_get_rssi();
+    }
+    else if (strcmp(command, "test spi") == 0 || strcmp(command, "tspi") == 0) {
+        cmd_test_spi_usart4();
+    }
+    else if (strcmp(command, "test lora") == 0 || strcmp(command, "tl") == 0) {
+        cmd_test_lora_init_usart4();
     }
     else if (strncmp(command, "sum ", 4) == 0) {
         cmd_math_operation_usart4(command);
@@ -766,5 +786,97 @@ void cmd_lora_broadcast_usart4(void)
     } else {
         snprintf(response, sizeof(response), "Error reading sensor data for LoRa broadcast\r\n");
         command_interface_send_response_usart4(response);
+    }
+}
+
+// SPI test command handlers
+
+// Test SPI communication (USART2)
+void cmd_test_spi(void)
+{
+    command_interface_send_response("Testing SPI communication with SX1262...\r\n");
+    
+    if (sx1262_test_spi() == 0) {
+        command_interface_send_response("✓ SPI communication test successful\r\n");
+    } else {
+        command_interface_send_response("✗ SPI communication test failed\r\n");
+        command_interface_send_response("Check SPI connections and power supply\r\n");
+    }
+}
+
+// Test SPI communication (USART4)
+void cmd_test_spi_usart4(void)
+{
+    command_interface_send_response_usart4("Testing SPI communication with SX1262...\r\n");
+    
+    if (sx1262_test_spi() == 0) {
+        command_interface_send_response_usart4("✓ SPI communication test successful\r\n");
+    } else {
+        command_interface_send_response_usart4("✗ SPI communication test failed\r\n");
+        command_interface_send_response_usart4("Check SPI connections and power supply\r\n");
+    }
+}
+
+// Test LoRa initialization (USART2)
+void cmd_test_lora_init(void)
+{
+    command_interface_send_response("Testing LoRa module initialization...\r\n");
+    
+    // Test module detection
+    command_interface_send_response("Step 1: Testing module detection...\r\n");
+    if (sx1262_detect_module() == 0) {
+        command_interface_send_response("✓ Module detected\r\n");
+    } else {
+        command_interface_send_response("✗ Module not detected\r\n");
+        return;
+    }
+    
+    // Test reset
+    command_interface_send_response("Step 2: Testing module reset...\r\n");
+    if (sx1262_reset() == 0) {
+        command_interface_send_response("✓ Module reset successful\r\n");
+    } else {
+        command_interface_send_response("✗ Module reset failed\r\n");
+        command_interface_send_response("Trying alternative initialization...\r\n");
+    }
+    
+    // Test full initialization
+    command_interface_send_response("Step 3: Testing full initialization...\r\n");
+    if (sx1262_init() == 0) {
+        command_interface_send_response("✓ LoRa module initialization successful\r\n");
+    } else {
+        command_interface_send_response("✗ LoRa module initialization failed\r\n");
+    }
+}
+
+// Test LoRa initialization (USART4)
+void cmd_test_lora_init_usart4(void)
+{
+    command_interface_send_response_usart4("Testing LoRa module initialization...\r\n");
+    
+    // Test module detection
+    command_interface_send_response_usart4("Step 1: Testing module detection...\r\n");
+    if (sx1262_detect_module() == 0) {
+        command_interface_send_response_usart4("✓ Module detected\r\n");
+    } else {
+        command_interface_send_response_usart4("✗ Module not detected\r\n");
+        return;
+    }
+    
+    // Test reset
+    command_interface_send_response_usart4("Step 2: Testing module reset...\r\n");
+    if (sx1262_reset() == 0) {
+        command_interface_send_response_usart4("✓ Module reset successful\r\n");
+    } else {
+        command_interface_send_response_usart4("✗ Module reset failed\r\n");
+        command_interface_send_response_usart4("Trying alternative initialization...\r\n");
+    }
+    
+    // Test full initialization
+    command_interface_send_response_usart4("Step 3: Testing full initialization...\r\n");
+    if (sx1262_init() == 0) {
+        command_interface_send_response_usart4("✓ LoRa module initialization successful\r\n");
+    } else {
+        command_interface_send_response_usart4("✗ LoRa module initialization failed\r\n");
     }
 }

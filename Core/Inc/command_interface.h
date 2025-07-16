@@ -34,5 +34,9 @@ void command_interface_show_help_usart4(void);
 // LoRa Command handlers
 void cmd_lora_broadcast(void);
 void cmd_lora_broadcast_usart4(void);
+void cmd_test_spi(void);
+void cmd_test_spi_usart4(void);
+void cmd_test_lora_init(void);
+void cmd_test_lora_init_usart4(void);
 
 #endif // __COMMAND_INTERFACE_H__ 
