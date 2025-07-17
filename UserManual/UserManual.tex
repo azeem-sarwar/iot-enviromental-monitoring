@@ -99,7 +99,7 @@
 \maketitle
 
 \begin{abstract}
-This user manual provides comprehensive documentation for the STM32G071RB IoT prototype system featuring LoRa wireless communication and BME680 environmental sensor integration. The system enables wireless sensor data transmission, environmental monitoring, and remote command control through dual UART interfaces. This manual covers hardware setup, software configuration, command interface usage, troubleshooting, and development guidelines.
+This user manual provides comprehensive documentation for the STM32G071RB IoT prototype system featuring SX1262 LoRa wireless communication and BME680 environmental sensor integration. The system enables wireless sensor data transmission, environmental monitoring, and remote command control through dual UART interfaces and SPI-based LoRa communication. This manual covers hardware setup, software configuration, command interface usage, troubleshooting, and development guidelines.
 \end{abstract}
 
 \tableofcontents
@@ -108,17 +108,18 @@ This user manual provides comprehensive documentation for the STM32G071RB IoT pr
 \section{System Overview}
 
 \subsection{Project Description}
-The STM32G071RB IoT prototype is an embedded system designed for wireless sensor data transmission and environmental monitoring. The system integrates a BME680 environmental sensor for temperature, pressure, and humidity measurements, and an SX126x LoRa module for long-range wireless communication.
+The STM32G071RB IoT prototype is an embedded system designed for wireless sensor data transmission and environmental monitoring. The system integrates a BME680 environmental sensor for temperature, pressure, and humidity measurements, and an SX1262 LoRa module for long-range wireless communication via SPI interface.
 
 \subsection{Key Features}
 \begin{itemize}
     \item \textbf{Environmental Sensing}: BME680 sensor for temperature, pressure, and humidity
-    \item \textbf{Wireless Communication}: LoRa (SX126x) for long-range data transmission
+    \item \textbf{Wireless Communication}: SX1262 LoRa module for long-range data transmission
     \item \textbf{Dual UART Interface}: USART2 and USART4 for command and debugging
     \item \textbf{I2C Communication}: For BME680 sensor interface
-    \item \textbf{SPI Communication}: For LoRa module interface
+    \item \textbf{SPI Communication}: For SX1262 LoRa module interface
     \item \textbf{Real-time Monitoring}: Continuous sensor data acquisition and transmission
     \item \textbf{Command Interface}: Interactive command system for system control
+    \item \textbf{BUSY Pin Monitoring}: Automatic SX1262 busy state detection
 \end{itemize}
 
 \subsection{Technical Specifications}
@@ -134,11 +135,13 @@ System Clock & 16 MHz \\
 \hline
 Operating Voltage & 3.3V \\
 \hline
-LoRa Frequency & 868 MHz \\
+LoRa Frequency & 868 MHz (EU band) \\
 \hline
 LoRa Spreading Factor & SF7 \\
 \hline
 LoRa Bandwidth & 125 kHz \\
+\hline
+LoRa Coding Rate & 4/5 \\
 \hline
 UART Baud Rate & 115200 bps \\
 \hline
@@ -156,11 +159,12 @@ SPI Speed & 8 MHz \\
 \begin{itemize}
     \item STM32G071RB Nucleo-64 board
     \item BME680 environmental sensor module
-    \item SX126x LoRa module (e.g., SX1262, SX1268)
+    \item SX1262 LoRa HAT module
     \item USB-to-UART converter (for USART4)
     \item Breadboard and jumper wires
     \item 4.7kOhm pull-up resistors (for I2C)
     \item Power supply (3.3V)
+    \item LoRa antenna (868 MHz)
 \end{itemize}
 
 \subsection{Pin Connections}
@@ -184,17 +188,19 @@ PA9 & I2C1 SCL & BME680 SCL \\
 \hline
 PA10 & I2C1 SDA & BME680 SDA \\
 \hline
-PA5 & SPI1 SCK & LoRa SCK \\
+PA5 & SPI1 SCK & SX1262 SCK \\
 \hline
-PA6 & SPI1 MISO & LoRa MISO \\
+PA6 & SPI1 MISO & SX1262 MISO \\
 \hline
-PA7 & SPI1 MOSI & LoRa MOSI \\
+PA7 & SPI1 MOSI & SX1262 MOSI \\
 \hline
-PA4 & SPI1 NSS & LoRa NSS \\
+PA4 & SPI1 NSS & SX1262 NSS \\
 \hline
-PC0 & GPIO & LoRa RESET \\
+PC0 & GPIO & SX1262 RESET \\
 \hline
-PA8 & GPIO & LoRa DIO1 \\
+PC1 & GPIO & SX1262 BUSY \\
+\hline
+PA8 & GPIO & SX1262 DIO1 \\
 \hline
 \end{tabular}
 \caption{STM32G071RB Pin Connections}
@@ -219,12 +225,12 @@ SDA & PA10 & I2C data line \\
 \caption{BME680 Sensor Connections}
 \end{table}
 
-\subsubsection{LoRa Module Connections}
+\subsubsection{SX1262 LoRa Module Connections}
 \begin{table}[h]
 \centering
 \begin{tabular}{|l|l|l|}
 \hline
-\textbf{LoRa Pin} & \textbf{STM32 Pin} & \textbf{Description} \\
+\textbf{SX1262 Pin} & \textbf{STM32 Pin} & \textbf{Description} \\
 \hline
 VCC & 3.3V & Power supply \\
 \hline
@@ -238,12 +244,14 @@ MOSI & PA7 & SPI data out \\
 \hline
 NSS & PA4 & SPI chip select \\
 \hline
-RESET & PC0 & Module reset \\
+RESET & PC0 & Module reset (active low) \\
+\hline
+BUSY & PC1 & Busy signal (input) \\
 \hline
 DIO1 & PA8 & Interrupt line \\
 \hline
 \end{tabular}
-\caption{LoRa Module Connections}
+\caption{SX1262 LoRa Module Connections}
 \end{table}
 
 \section{Software Architecture}
@@ -254,7 +262,7 @@ The project follows a modular architecture with the following components:
 \begin{itemize}
     \item \textbf{main.c}: System initialization and main loop
     \item \textbf{bme680\_interface.c}: BME680 sensor driver and interface
-    \item \textbf{lora\_interface.c}: LoRa communication interface
+    \item \textbf{lora\_interface.c}: SX1262 LoRa communication interface
     \item \textbf{command\_interface.c}: Command processing and user interface
     \item \textbf{sx126x.c}: SX126x LoRa driver (external library)
 \end{itemize}
@@ -263,7 +271,7 @@ The project follows a modular architecture with the following components:
 \begin{enumerate}
     \item Hardware initialization (GPIO, UART, I2C, SPI)
     \item BME680 sensor detection and initialization
-    \item LoRa module detection and configuration
+    \item SX1262 LoRa module detection and configuration
     \item Command interface startup
     \item Main loop execution
 \end{enumerate}
@@ -278,12 +286,13 @@ The project follows a modular architecture with the following components:
     \item \textbf{Pull-up Resistors}: 4.7kOhm recommended
 \end{itemize}
 
-\subsubsection{SPI Protocol (LoRa)}
+\subsubsection{SPI Protocol (SX1262)}
 \begin{itemize}
     \item \textbf{Clock Speed}: 8 MHz
     \item \textbf{Mode}: SPI Mode 0 (CPOL=0, CPHA=0)
     \item \textbf{Data Order}: MSB first
     \item \textbf{Chip Select}: Active low
+    \item \textbf{BUSY Pin}: Automatic busy state monitoring
 \end{itemize}
 
 \subsubsection{UART Protocol}
@@ -343,18 +352,18 @@ The project follows a modular architecture with the following components:
 \caption{Sensor Commands}
 \end{table}
 
-\subsubsection{LoRa Commands}
+\subsubsection{SX1262 LoRa Commands}
 \begin{table}[h]
 \centering
 \begin{tabular}{|l|l|l|}
 \hline
 \textbf{Command} & \textbf{Alias} & \textbf{Description} \\
 \hline
-\texttt{lora broadcast} & \texttt{lb} & Broadcast sensor data via LoRa \\
+\texttt{lora broadcast} & \texttt{lb} & Broadcast sensor data via SX1262 LoRa \\
 \hline
-\texttt{lora config} & \texttt{lc} & Show LoRa configuration \\
+\texttt{lora config} & \texttt{lc} & Show SX1262 LoRa configuration \\
 \hline
-\texttt{lora test} & \texttt{lt} & Test LoRa transmission \\
+\texttt{lora test} & \texttt{lt} & Test SX1262 LoRa transmission \\
 \hline
 \texttt{lora scan} & \texttt{ls} & Scan for LoRa signals (5s) \\
 \hline
@@ -364,8 +373,14 @@ The project follows a modular architecture with the following components:
 \hline
 \texttt{lora rssi} & \texttt{lr} & Get current RSSI \\
 \hline
+\texttt{lora detect} & \texttt{ld} & Test SX1262 module detection \\
+\hline
+\texttt{lora reset} & \texttt{lrst} & Test SX1262 hardware reset \\
+\hline
+\texttt{lora init} & \texttt{li} & Test SX1262 initialization \\
+\hline
 \end{tabular}
-\caption{LoRa Commands}
+\caption{SX1262 LoRa Commands}
 \end{table}
 
 \subsubsection{System Commands}
@@ -422,19 +437,32 @@ Sensor Test Results:
 - Status: OK
 \end{lstlisting}
 
-\subsubsection{LoRa Communication}
-\begin{lstlisting}[caption=LoRa Communication]
+\subsubsection{SX1262 LoRa Communication}
+\begin{lstlisting}[caption=SX1262 LoRa Communication]
+> lt
+Testing SX1262 LoRa transmission...
+✓ SX1262 transmission test successful
+
 > lb
-Broadcasting sensor data via LoRa...
-Message sent: {"temp":23.45,"press":1013.25,"hum":45.67,"node":"STM32"}
+Broadcasting sensor data via SX1262 LoRa...
+✓ Sensor data sent successfully via SX1262 LoRa
+
 > lc
-LoRa Configuration:
-- Frequency: 868000000 Hz
-- Spreading Factor: SF7
-- Bandwidth: 125 kHz
-- Coding Rate: 4/5
-- TX Power: 14 dBm
-- Sync Word: 0x12
+=== SX1262 LoRa Configuration ===
+Status: Module detected
+Initialized: Yes
+Frequency: 868 MHz (EU band)
+Spreading Factor: SF7
+Bandwidth: 125 kHz
+Coding Rate: 4/5
+TX Power: 14 dBm
+Sync Word: 0x12
+Payload Length: 64 bytes
+Preamble Length: 8 symbols
+CRC: Enabled
+IQ Inversion: Disabled
+========================
+
 > ls
 Scanning for LoRa signals...
 RSSI: -85 dBm
@@ -464,7 +492,7 @@ I2C bus errors & Wiring issues & Verify SCL/PA9 and SDA/PA10 connections \\
 \caption{BME680 Troubleshooting}
 \end{table}
 
-\subsubsection{LoRa Module Issues}
+\subsubsection{SX1262 LoRa Module Issues}
 \begin{table}[h]
 \centering
 \begin{tabular}{|l|l|l|}
@@ -473,6 +501,10 @@ I2C bus errors & Wiring issues & Verify SCL/PA9 and SDA/PA10 connections \\
 \hline
 Module not detected & SPI wiring issues & Check SCK, MISO, MOSI, NSS connections \\
 \hline
+BUSY timeout & BUSY pin not connected & Verify PC1 connection to SX1262 BUSY pin \\
+\hline
+Reset failures & RESET pin issues & Check PC0 connection and timing \\
+\hline
 Transmission failures & Antenna not connected & Connect proper LoRa antenna \\
 \hline
 Low signal strength & Wrong frequency & Verify 868 MHz configuration \\
@@ -480,7 +512,7 @@ Low signal strength & Wrong frequency & Verify 868 MHz configuration \\
 Communication errors & SPI speed too high & Reduce SPI clock frequency \\
 \hline
 \end{tabular}
-\caption{LoRa Troubleshooting}
+\caption{SX1262 LoRa Troubleshooting}
 \end{table}
 
 \subsubsection{UART Communication Issues}
@@ -508,7 +540,10 @@ Use these commands to diagnose system issues:
 \begin{itemize}
     \item \command{scan i2c}: Check I2C bus for connected devices
     \item \command{raw registers}: Read raw BME680 registers for debugging
-    \item \command{lora config}: Verify LoRa module configuration
+    \item \command{lora detect}: Test SX1262 module detection
+    \item \command{lora reset}: Test SX1262 hardware reset
+    \item \command{lora init}: Test SX1262 initialization
+    \item \command{lora config}: Verify SX1262 LoRa configuration
     \item \command{lora rssi}: Check signal strength
 \end{itemize}
 
@@ -523,8 +558,8 @@ System Clock: 16 MHz
 I2C1 Configuration: PA9 (SCL), PA10 (SDA)
 USART2: PA2 (TX), PA3 (RX) - 115200 baud
 USART4: PA0 (TX), PA1 (RX) - 115200 baud
-SPI1: PA5 (SCK), PA6 (MISO), PA7 (MOSI)
-LoRa: PA4 (NSS), PC0 (RESET)
+SPI1: PA5 (SCK), PA6 (MISO), PA7 (MOSI), PA4 (NSS)
+SX1262: PC0 (RESET), PC1 (BUSY), PA8 (DIO1)
 LED Status: PA5
 ========================================
 \end{lstlisting}
@@ -553,16 +588,18 @@ conf.filter = BME68X_FILTER_SIZE_3; // IIR filter
 conf.odr = BME68X_ODR_1000_MS; // Output data rate
 \end{lstlisting}
 
-\subsection{Modifying LoRa Parameters}
-To modify LoRa communication parameters:
+\subsection{Modifying SX1262 LoRa Parameters}
+To modify SX1262 LoRa communication parameters:
 
-\begin{lstlisting}[caption=LoRa Configuration Example]
-static sx126x_mod_params_lora_t lora_mod_params = {
-    .sf = SX126X_LORA_SF8,        // Spreading factor
-    .bw = SX126X_LORA_BW_250,     // Bandwidth
-    .cr = SX126X_LORA_CR_4_7,     // Coding rate
-    .ldro = 1                     // Low data rate optimization
-};
+\begin{lstlisting}[caption=SX1262 LoRa Configuration Example]
+#define SX1262_FREQUENCY_HZ        868000000  // 868 MHz (EU band)
+#define SX1262_TX_POWER_DBM        14         // 14 dBm output power
+#define SX1262_SPREADING_FACTOR    7          // SF7
+#define SX1262_BANDWIDTH           125        // 125 kHz
+#define SX1262_CODING_RATE         1          // 4/5
+#define SX1262_PREAMBLE_LENGTH     8
+#define SX1262_PAYLOAD_LENGTH      64
+#define SX1262_SYNC_WORD           0x12
 \end{lstlisting}
 
 \section{Performance Characteristics}
@@ -584,14 +621,14 @@ Humidity & 0\% to 100\% & +/-3\% \\
 \caption{BME680 Performance Specifications}
 \end{table}
 
-\subsection{LoRa Performance}
+\subsection{SX1262 LoRa Performance}
 \begin{table}[h]
 \centering
 \begin{tabular}{|l|l|l|}
 \hline
 \textbf{Parameter} & \textbf{Value} & \textbf{Description} \\
 \hline
-Frequency & 868 MHz & Operating frequency \\
+Frequency & 868 MHz & EU band operating frequency \\
 \hline
 Range & Up to 15 km & Line of sight \\
 \hline
@@ -599,26 +636,32 @@ Data Rate & 5.47 kbps & With SF7, 125 kHz BW \\
 \hline
 TX Power & 14 dBm & Maximum output power \\
 \hline
+Spreading Factor & SF7 & LoRa spreading factor \\
+\hline
+Bandwidth & 125 kHz & LoRa bandwidth \\
+\hline
+Coding Rate & 4/5 & Forward error correction \\
+\hline
 \end{tabular}
-\caption{LoRa Performance Specifications}
+\caption{SX1262 LoRa Performance Specifications}
 \end{table}
 
 \subsection{System Performance}
 \begin{itemize}
     \item \textbf{Command Response Time}: < 100 ms
     \item \textbf{Sensor Read Time}: < 50 ms
-    \item \textbf{LoRa Transmission Time}: < 200 ms
+    \item \textbf{SX1262 Transmission Time}: < 200 ms
     \item \textbf{Power Consumption}: ~50 mA (active mode)
 \end{itemize}
 
 \section{Advanced Features}
 
 \subsection{Continuous Monitoring}
-The system supports continuous LoRa monitoring for detecting signals from other devices:
+The system supports continuous SX1262 LoRa monitoring for detecting signals from other devices:
 
 \begin{lstlisting}[caption=Continuous Monitoring]
 > lm
-Starting continuous LoRa monitoring...
+Starting continuous SX1262 LoRa monitoring...
 Monitoring for signals...
 RSSI: -87 dBm
 Packet received: {"temp":24.1,"press":1012.8,"hum":48.2,"node":"Node2"}
@@ -629,12 +672,12 @@ Monitoring stopped.
 \end{lstlisting}
 
 \subsection{Sensor Data Broadcasting}
-Automatic broadcasting of sensor data in JSON format:
+Automatic broadcasting of sensor data in JSON format via SX1262:
 
 \begin{lstlisting}[caption=Sensor Data Broadcast]
 > lb
-Broadcasting sensor data via LoRa...
-Message sent: {"temp":23.45,"press":1013.25,"hum":45.67,"node":"STM32"}
+Broadcasting sensor data via SX1262 LoRa...
+✓ Sensor data sent successfully via SX1262 LoRa
 \end{lstlisting}
 
 \subsection{I2C Bus Scanning}
@@ -655,6 +698,7 @@ Total devices found: 1
     \item Verify sensor calibration annually
     \item Update firmware as needed
     \item Monitor system logs for errors
+    \item Check SX1262 antenna connection
 \end{itemize}
 
 \subsection{Calibration}
@@ -675,6 +719,7 @@ For technical support and questions:
     \item Review troubleshooting section
     \item Verify hardware connections
     \item Test with known good components
+    \item Use diagnostic commands for SX1262
 \end{itemize}
 
 \section{Appendices}
@@ -708,29 +753,35 @@ For technical support and questions:
 #define SPI1_NSS_PIN GPIO_PIN_4
 #define SPI1_NSS_PORT GPIOA
 
-// LoRa Control Pins
+// SX1262 Control Pins
 #define LORA_RESET_PIN GPIO_PIN_0
 #define LORA_RESET_PORT GPIOC
+#define LORA_BUSY_PIN GPIO_PIN_1
+#define LORA_BUSY_PORT GPIOC
 #define LORA_DIO1_PIN GPIO_PIN_8
 #define LORA_DIO1_PORT GPIOA
 \end{lstlisting}
 
 \subsection{Appendix B: Configuration Constants}
 \begin{lstlisting}[caption=Configuration Constants]
-// LoRa Configuration
-#define LORA_FREQUENCY_HZ        868000000
-#define LORA_TX_POWER_DBM        14
-#define LORA_SYNC_WORD           0x12
-#define LORA_PAYLOAD_LENGTH      64
+// SX1262 LoRa Configuration
+#define SX1262_FREQUENCY_HZ        868000000
+#define SX1262_TX_POWER_DBM        14
+#define SX1262_SPREADING_FACTOR    7
+#define SX1262_BANDWIDTH           125
+#define SX1262_CODING_RATE         1
+#define SX1262_PREAMBLE_LENGTH     8
+#define SX1262_PAYLOAD_LENGTH      64
+#define SX1262_SYNC_WORD           0x12
 
 // BME680 Configuration
-#define BME68X_I2C_ADDR_LOW      0x76
-#define BME68X_I2C_ADDR_HIGH     0x77
-#define BME68X_CHIP_ID           0x61
+#define BME68X_I2C_ADDR_LOW        0x76
+#define BME68X_I2C_ADDR_HIGH       0x77
+#define BME68X_CHIP_ID             0x61
 
 // System Configuration
-#define CMD_BUFFER_SIZE          128
-#define SYSTEM_CLOCK_HZ          16000000
+#define CMD_BUFFER_SIZE            128
+#define SYSTEM_CLOCK_HZ            16000000
 \end{lstlisting}
 
 \subsection{Appendix C: Error Codes}
@@ -746,9 +797,9 @@ BME68X\_E\_COM\_FAIL & Communication failure & Check I2C connections \\
 \hline
 BME68X\_E\_DEV\_NOT\_FOUND & Device not found & Check sensor power and address \\
 \hline
-SX126X\_STATUS\_OK & LoRa operation successful & None \\
+SX126X\_STATUS\_OK & SX1262 operation successful & None \\
 \hline
-SX126X\_STATUS\_ERROR & LoRa operation failed & Check SPI connections \\
+SX126X\_STATUS\_ERROR & SX1262 operation failed & Check SPI connections \\
 \hline
 HAL\_OK & HAL operation successful & None \\
 \hline
@@ -786,11 +837,11 @@ HAL\_ERROR & HAL operation failed & Check hardware connections \\
 \hline
 \texttt{scan i2c} & \texttt{si} & Scan I2C bus \\
 \hline
-\texttt{lora broadcast} & \texttt{lb} & Broadcast sensor data \\
+\texttt{lora broadcast} & \texttt{lb} & Broadcast sensor data via SX1262 \\
 \hline
-\texttt{lora config} & \texttt{lc} & Show LoRa config \\
+\texttt{lora config} & \texttt{lc} & Show SX1262 LoRa config \\
 \hline
-\texttt{lora test} & \texttt{lt} & Test LoRa transmission \\
+\texttt{lora test} & \texttt{lt} & Test SX1262 LoRa transmission \\
 \hline
 \texttt{lora scan} & \texttt{ls} & Scan for signals (5s) \\
 \hline
@@ -799,6 +850,12 @@ HAL\_ERROR & HAL operation failed & Check hardware connections \\
 \texttt{lora stop} & \texttt{lst} & Stop monitoring \\
 \hline
 \texttt{lora rssi} & \texttt{lr} & Get RSSI \\
+\hline
+\texttt{lora detect} & \texttt{ld} & Test SX1262 detection \\
+\hline
+\texttt{lora reset} & \texttt{lrst} & Test SX1262 reset \\
+\hline
+\texttt{lora init} & \texttt{li} & Test SX1262 initialization \\
 \hline
 \texttt{sum <n1> <n2>} & - & Add numbers \\
 \hline
