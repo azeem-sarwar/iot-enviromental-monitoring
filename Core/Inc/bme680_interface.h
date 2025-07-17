@@ -21,5 +21,6 @@ void bme680_read_raw_registers(void);
 void bme680_read_raw_adc_values(void);
 void bme680_check_calibration_data(void);
 float decode_ieee754(uint32_t hex_value);
+void bme680_comprehensive_diagnostic(void);
 
 #endif // __BME680_INTERFACE_H__ 

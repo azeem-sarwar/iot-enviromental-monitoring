@@ -103,6 +103,10 @@ int main(void)
   MX_I2C1_Init();
   MX_USART4_UART_Init();
   MX_SPI1_Init();
+  
+  // Small delay to ensure I2C bus is stable
+  HAL_Delay(100);
+  
   /* USER CODE BEGIN 2 */
   // System initialization messages
   command_interface_send_response("========================================\r\n");

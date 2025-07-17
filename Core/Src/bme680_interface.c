@@ -745,3 +745,198 @@ void bme680_test_sensor(void)
     HAL_UART_Transmit(&huart2, (uint8_t*)test_msg, strlen(test_msg), HAL_MAX_DELAY);
     HAL_UART_Transmit(&huart4, (uint8_t*)test_msg, strlen(test_msg), HAL_MAX_DELAY);
 } 
+
+// Comprehensive BME680 diagnostic function
+void bme680_comprehensive_diagnostic(void)
+{
+    char debug_msg[256];
+    HAL_StatusTypeDef status;
+    uint8_t chip_id;
+    uint8_t raw_data[32];
+    
+    debug_print("\r\n=== BME680 COMPREHENSIVE DIAGNOSTIC ===\r\n");
+    
+    // 1. Test I2C bus communication
+    debug_print("1. Testing I2C bus communication...\r\n");
+    
+    // Test both possible addresses
+    uint8_t addresses[] = {0x76, 0x77};
+    const char* addr_names[] = {"0x76", "0x77"};
+    int device_found = 0;
+    
+    for (int i = 0; i < 2; i++) {
+        snprintf(debug_msg, sizeof(debug_msg), "   Testing address %s...\r\n", addr_names[i]);
+        debug_print(debug_msg);
+        
+        // Test device ready
+        status = HAL_I2C_IsDeviceReady(&hi2c1, addresses[i] << 1, 3, 1000);
+        if (status == HAL_OK) {
+            snprintf(debug_msg, sizeof(debug_msg), "   ✓ Device responds at %s\r\n", addr_names[i]);
+            debug_print(debug_msg);
+            device_found = 1;
+            
+            // Try to read chip ID
+            status = HAL_I2C_Mem_Read(&hi2c1, addresses[i] << 1, 0xD0, 
+                                      I2C_MEMADD_SIZE_8BIT, &chip_id, 1, 1000);
+            
+            if (status == HAL_OK) {
+                snprintf(debug_msg, sizeof(debug_msg), "   ✓ Chip ID: 0x%02X (Expected: 0x61)\r\n", chip_id);
+                debug_print(debug_msg);
+                
+                if (chip_id == 0x61) {
+                    snprintf(debug_msg, sizeof(debug_msg), "   ✓ Valid BME680 chip ID found!\r\n");
+                    debug_print(debug_msg);
+                } else {
+                    snprintf(debug_msg, sizeof(debug_msg), "   ✗ Wrong chip ID - not a BME680\r\n");
+                    debug_print(debug_msg);
+                }
+            } else {
+                snprintf(debug_msg, sizeof(debug_msg), "   ✗ Failed to read chip ID\r\n");
+                debug_print(debug_msg);
+            }
+        } else {
+            snprintf(debug_msg, sizeof(debug_msg), "   ✗ No device at %s\r\n", addr_names[i]);
+            debug_print(debug_msg);
+        }
+    }
+    
+    if (!device_found) {
+        debug_print("   ✗ No I2C devices found - check wiring!\r\n");
+        debug_print("   Wiring check:\r\n");
+        debug_print("     - PA9 (SCL) → BME680 SCL\r\n");
+        debug_print("     - PA10 (SDA) → BME680 SDA\r\n");
+        debug_print("     - 3.3V → BME680 VCC\r\n");
+        debug_print("     - GND → BME680 GND\r\n");
+        debug_print("     - Add 4.7kΩ pull-up resistors to SCL and SDA\r\n");
+        return;
+    }
+    
+    // 2. Test register access
+    debug_print("\r\n2. Testing register access...\r\n");
+    
+    // Read multiple registers to test communication
+    status = HAL_I2C_Mem_Read(&hi2c1, 0x76 << 1, 0xD0, 
+                              I2C_MEMADD_SIZE_8BIT, raw_data, 8, 1000);
+    
+    if (status == HAL_OK) {
+        snprintf(debug_msg, sizeof(debug_msg), 
+                 "   ✓ Register read successful: 0xD0=0x%02X, 0xD1=0x%02X, 0xD2=0x%02X\r\n",
+                 raw_data[0], raw_data[1], raw_data[2]);
+        debug_print(debug_msg);
+    } else {
+        snprintf(debug_msg, sizeof(debug_msg), "   ✗ Register read failed: %d\r\n", status);
+        debug_print(debug_msg);
+    }
+    
+    // 3. Test sensor initialization
+    debug_print("\r\n3. Testing sensor initialization...\r\n");
+    
+    int8_t init_result = bme680_init_sensor();
+    snprintf(debug_msg, sizeof(debug_msg), "   Init result: %d\r\n", init_result);
+    debug_print(debug_msg);
+    
+    if (init_result == BME68X_OK) {
+        debug_print("   ✓ Sensor initialization successful\r\n");
+    } else {
+        debug_print("   ✗ Sensor initialization failed\r\n");
+        debug_print("   Possible causes:\r\n");
+        debug_print("     - Wrong I2C address\r\n");
+        debug_print("     - Power supply issues\r\n");
+        debug_print("     - Communication timing issues\r\n");
+    }
+    
+    // 4. Test sensor data reading
+    debug_print("\r\n4. Testing sensor data reading...\r\n");
+    
+    struct bme68x_data sensor_data;
+    int8_t read_result = bme680_read_sensor_data(&sensor_data);
+    snprintf(debug_msg, sizeof(debug_msg), "   Read result: %d\r\n", read_result);
+    debug_print(debug_msg);
+    
+    if (read_result == BME68X_OK) {
+        debug_print("   ✓ Sensor data read successful\r\n");
+        
+        // Check if values are reasonable
+        snprintf(debug_msg, sizeof(debug_msg), 
+                 "   Raw values - Temp: %.6f, Press: %.6f, Hum: %.6f\r\n",
+                 sensor_data.temperature, sensor_data.pressure, sensor_data.humidity);
+        debug_print(debug_msg);
+        
+        // Check for zero or invalid values
+        if (sensor_data.temperature == 0.0f && sensor_data.pressure == 0.0f && sensor_data.humidity == 0.0f) {
+            debug_print("   ⚠ All values are zero - possible library issue\r\n");
+        } else if (isnan(sensor_data.temperature) || isnan(sensor_data.pressure) || isnan(sensor_data.humidity)) {
+            debug_print("   ⚠ Invalid values detected (NaN)\r\n");
+        } else {
+            debug_print("   ✓ Values appear valid\r\n");
+        }
+    } else {
+        debug_print("   ✗ Sensor data read failed\r\n");
+    }
+    
+    // 5. Test raw register reading
+    debug_print("\r\n5. Testing raw register reading...\r\n");
+    
+    // Read temperature, pressure, and humidity registers
+    status = HAL_I2C_Mem_Read(&hi2c1, 0x76 << 1, 0x22, 
+                              I2C_MEMADD_SIZE_8BIT, raw_data, 8, 1000);
+    
+    if (status == HAL_OK) {
+        uint32_t temp_raw = ((uint32_t)raw_data[0] << 12) | ((uint32_t)raw_data[1] << 4) | ((uint32_t)raw_data[2] >> 4);
+        uint32_t press_raw = ((uint32_t)raw_data[3] << 12) | ((uint32_t)raw_data[4] << 4) | ((uint32_t)raw_data[5] >> 4);
+        uint16_t hum_raw = ((uint16_t)raw_data[6] << 8) | raw_data[7];
+        
+        snprintf(debug_msg, sizeof(debug_msg), 
+                 "   Raw ADC values - Temp: %lu, Press: %lu, Hum: %u\r\n",
+                 temp_raw, press_raw, hum_raw);
+        debug_print(debug_msg);
+        
+        // Check if raw values are reasonable (not all zeros)
+        if (temp_raw == 0 && press_raw == 0 && hum_raw == 0) {
+            debug_print("   ⚠ All raw ADC values are zero - sensor may not be measuring\r\n");
+        } else {
+            debug_print("   ✓ Raw ADC values appear valid\r\n");
+        }
+    } else {
+        snprintf(debug_msg, sizeof(debug_msg), "   ✗ Raw register read failed: %d\r\n", status);
+        debug_print(debug_msg);
+    }
+    
+    // 6. Test calibration data
+    debug_print("\r\n6. Testing calibration data...\r\n");
+    
+    uint8_t calib_data[32];
+    status = HAL_I2C_Mem_Read(&hi2c1, 0x76 << 1, 0xE1, 
+                              I2C_MEMADD_SIZE_8BIT, calib_data, 32, 1000);
+    
+    if (status == HAL_OK) {
+        debug_print("   ✓ Calibration data read successful\r\n");
+        
+        // Check if calibration data looks reasonable (not all zeros or 0xFF)
+        int valid_calib = 0;
+        for (int i = 0; i < 32; i++) {
+            if (calib_data[i] != 0 && calib_data[i] != 0xFF) {
+                valid_calib = 1;
+                break;
+            }
+        }
+        
+        if (valid_calib) {
+            debug_print("   ✓ Calibration data appears valid\r\n");
+        } else {
+            debug_print("   ⚠ Calibration data may be invalid (all zeros or 0xFF)\r\n");
+        }
+    } else {
+        snprintf(debug_msg, sizeof(debug_msg), "   ✗ Calibration data read failed: %d\r\n", status);
+        debug_print(debug_msg);
+    }
+    
+    debug_print("\r\n=== DIAGNOSTIC COMPLETE ===\r\n");
+    debug_print("Summary:\r\n");
+    debug_print("- If I2C scan failed: Check wiring and power supply\r\n");
+    debug_print("- If chip ID wrong: Wrong sensor or address\r\n");
+    debug_print("- If init failed: Check sensor configuration\r\n");
+    debug_print("- If read failed: Check sensor mode and timing\r\n");
+    debug_print("- If values zero: Check sensor operation mode\r\n");
+    debug_print("- If values invalid: Check library compatibility\r\n");
+} 

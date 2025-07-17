@@ -14,3 +14,4 @@
 ../Core/Src/bme680_interface.c:583:6:bme680_read_raw_adc_values	3
 ../Core/Src/bme680_interface.c:629:6:bme680_read_raw_registers	2
 ../Core/Src/bme680_interface.c:666:6:bme680_test_sensor	23
+../Core/Src/bme680_interface.c:750:6:bme680_comprehensive_diagnostic	24

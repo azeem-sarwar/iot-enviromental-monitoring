@@ -121,6 +121,7 @@ void command_interface_show_help(void)
     command_interface_send_response("  raw registers (rr)    - Read raw BME680 registers\r\n");
     command_interface_send_response("  raw adc (ra)          - Read raw BME680 ADC values\r\n");
     command_interface_send_response("  calib data (cd)       - Check BME680 calibration data\r\n");
+    command_interface_send_response("  bme diagnostic (bd)   - Run comprehensive BME680 diagnostic\r\n");
     command_interface_send_response("  scan i2c (si)         - Scan I2C bus for devices\r\n");
     command_interface_send_response("\r\nLoRa Commands:\r\n");
     command_interface_send_response("  lora broadcast (lb)   - Broadcast sensor data via SX1262 LoRa\r\n");
@@ -181,6 +182,9 @@ void command_interface_handle_command(char* command)
     }
     else if (strcmp(command, "calib data") == 0 || strcmp(command, "cd") == 0) {
         bme680_check_calibration_data();
+    }
+    else if (strcmp(command, "bme diagnostic") == 0 || strcmp(command, "bd") == 0) {
+        bme680_comprehensive_diagnostic();
     }
     else if (strcmp(command, "scan i2c") == 0 || strcmp(command, "si") == 0) {
         i2c_scan_bus();
@@ -475,6 +479,7 @@ void command_interface_show_help_usart4(void)
     command_interface_send_response_usart4("  raw registers (rr)    - Read raw BME680 registers\r\n");
     command_interface_send_response_usart4("  raw adc (ra)          - Read raw BME680 ADC values\r\n");
     command_interface_send_response_usart4("  calib data (cd)       - Check BME680 calibration data\r\n");
+    command_interface_send_response_usart4("  bme diagnostic (bd)   - Run comprehensive BME680 diagnostic\r\n");
     command_interface_send_response_usart4("  scan i2c (si)         - Scan I2C bus for devices\r\n");
     command_interface_send_response_usart4("  lora broadcast (lb)   - Broadcast sensor data via SX1262 LoRa\r\n");
     command_interface_send_response_usart4("  lora config (lc)      - Show SX1262 LoRa configuration\r\n");
@@ -534,6 +539,9 @@ void command_interface_handle_command_usart4(char* command)
     }
     else if (strcmp(command, "calib data") == 0 || strcmp(command, "cd") == 0) {
         bme680_check_calibration_data();
+    }
+    else if (strcmp(command, "bme diagnostic") == 0 || strcmp(command, "bd") == 0) {
+        bme680_comprehensive_diagnostic();
     }
     else if (strcmp(command, "scan i2c") == 0 || strcmp(command, "si") == 0) {
         i2c_scan_bus();

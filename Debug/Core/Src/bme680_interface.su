@@ -14,3 +14,4 @@
 ../Core/Src/bme680_interface.c:583:6:bme680_read_raw_adc_values	200	static
 ../Core/Src/bme680_interface.c:629:6:bme680_read_raw_registers	192	static
 ../Core/Src/bme680_interface.c:666:6:bme680_test_sensor	432	static
+../Core/Src/bme680_interface.c:750:6:bme680_comprehensive_diagnostic	464	static
