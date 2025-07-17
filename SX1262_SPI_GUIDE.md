@@ -7,7 +7,7 @@ Connect your SX1262 LoRa HAT to the STM32 Nucleo board using the following pin m
 | SX1262 HAT Pin  | Function        | STM32 Pin           | Description                    |
 | --------------- | --------------- | ------------------- | ------------------------------ |
 | GPIO11 (Pin 23) | SCK             | PA5  (pin 11) cn 10 | SPI Clock                      |
-| GPIO10 (Pin 19) | MOSI            | PA7  (pin 11) cn 15 |  SPI Master Out Slave In        |
+| GPIO10 (Pin 19) | MOSI            | PA7  (pin 15) cn 15 |  SPI Master Out Slave In        |
 | GPIO9 (Pin 21)  | MISO            | PA6  (pin 13) cn 10 |  SPI Master In Slave Out        |
 | GPIO8 (Pin 24)  | NSS / CS        | PA4  (pin 32) cn 07 | SPI Chip Select                |
 | GPIO25 (Pin 22) | RESET           | PC0  (pin 18) cn 10 | Module Reset (Active Low)      |
