@@ -20,19 +20,56 @@ static sx1262_context_t sx1262_ctx = {
     .reset_port = GPIOC,
     .reset_pin = GPIO_PIN_0,
     .busy_port = GPIOC,
-    .busy_pin = GPIO_PIN_1
+    .busy_pin = GPIO_PIN_3
 };
 
-// Debug function
-static void sx1262_debug_print(const char* message) {
-    HAL_UART_Transmit(&huart2, (uint8_t*)message, strlen(message), 1000);
-    HAL_UART_Transmit(&huart4, (uint8_t*)message, strlen(message), 1000);
-}
+// SX1262 Command definitions (from datasheet)
+#define SX1262_CMD_NOP                    0x00
+#define SX1262_CMD_GET_STATUS             0xC0
+#define SX1262_CMD_WRITE_REGISTER         0x0D
+#define SX1262_CMD_READ_REGISTER          0x1D
+#define SX1262_CMD_WRITE_BUFFER           0x0E
+#define SX1262_CMD_READ_BUFFER            0x1E
+#define SX1262_CMD_SET_SLEEP              0x84
+#define SX1262_CMD_SET_STANDBY            0x80
+#define SX1262_CMD_SET_FS                 0xC1
+#define SX1262_CMD_SET_TX                 0x83
+#define SX1262_CMD_SET_RX                 0x82
+#define SX1262_CMD_SET_STOP_TIMER_ON_PREAMBLE 0x9F
+#define SX1262_CMD_SET_RX_DUTY_CYCLE     0x94
+#define SX1262_CMD_SET_CAD                0xC5
+#define SX1262_CMD_SET_TX_CONTINUOUS_WAVE 0xD1
+#define SX1262_CMD_SET_TX_INFINITE_PREAMBLE 0xD2
+#define SX1262_CMD_SET_REGULATOR_MODE    0x96
+#define SX1262_CMD_CALIBRATE             0x89
+#define SX1262_CMD_CALIBRATE_IMAGE       0x98
+#define SX1262_CMD_SET_PA_CFG            0x95
+#define SX1262_CMD_SET_RX_TX_FALLBACK_MODE 0x93
+#define SX1262_CMD_SET_DIO_IRQ_PARAMS    0x8D
+#define SX1262_CMD_SET_RF_FREQUENCY      0x86
+#define SX1262_CMD_SET_PKT_TYPE          0x8A
+#define SX1262_CMD_GET_PKT_STATUS        0x11
+#define SX1262_CMD_SET_MODULATION_PARAMS 0x8B
+#define SX1262_CMD_SET_PKT_PARAMS        0x8C
+#define SX1262_CMD_SET_TX_PARAMS         0x8E
+#define SX1262_CMD_SET_BUFFER_BASE_ADDRESS 0x8F
+#define SX1262_CMD_SET_LORA_SYNC_WORD   0x91
+#define SX1262_CMD_SET_LORA_SYMB_NUM_TIMEOUT 0x0A
+#define SX1262_CMD_SET_LORA_PKT_TYPE    0x0B
+#define SX1262_CMD_GET_RSSI_INST         0x15
+#define SX1262_CMD_SET_GF_MODE           0x92
+
+// SX1262 Register addresses
+#define SX1262_REG_LORA_SYNC_WORD_MSB    0x0740
+#define SX1262_REG_LORA_SYNC_WORD_LSB    0x0741
+#define SX1262_REG_RANDOM_NUMBER_GEN     0x0819
+#define SX1262_REG_ANALOG_DFO            0x081A
+#define SX1262_REG_ANALOG_DFO_MSB        0x081B
+#define SX1262_REG_ANALOG_DFO_LSB        0x081C
 
 // Wait for SX1262 BUSY pin to go low
 uint8_t sx1262_wait_for_busy(void) {
-    uint32_t timeout = HAL_GetTick() + 2000; // 2 second timeout (increased)
-    uint32_t start_time = HAL_GetTick();
+    uint32_t timeout = HAL_GetTick() + 2000; // 2 second timeout
     
     // First check if BUSY is already low
     if (HAL_GPIO_ReadPin(sx1262_ctx.busy_port, sx1262_ctx.busy_pin) == GPIO_PIN_RESET) {
@@ -42,10 +79,6 @@ uint8_t sx1262_wait_for_busy(void) {
     // Wait for BUSY to go low
     while (HAL_GPIO_ReadPin(sx1262_ctx.busy_port, sx1262_ctx.busy_pin) == GPIO_PIN_SET) {
         if (HAL_GetTick() > timeout) {
-            sx1262_debug_print("BUSY timeout after ");
-            char timeout_msg[32];
-            snprintf(timeout_msg, sizeof(timeout_msg), "%lu ms\r\n", HAL_GetTick() - start_time);
-            sx1262_debug_print(timeout_msg);
             return 0; // Timeout
         }
         HAL_Delay(1); // Small delay to prevent tight loop
@@ -58,14 +91,10 @@ uint8_t sx1262_wait_for_busy(void) {
 int8_t sx1262_detect_module(void) {
     uint8_t status;
     
-    sx1262_debug_print("Detecting SX1262 module...\r\n");
-    
     // Try to read the chip status register
-    if (sx1262_spi_read(0xC0, &status, 1) == 0) {
-        sx1262_debug_print("✓ SX1262 module detected\r\n");
+    if (sx1262_spi_read(SX1262_CMD_GET_STATUS, &status, 1) == 0) {
         return 0;
     } else {
-        sx1262_debug_print("✗ SX1262 module not detected\r\n");
         return -1;
     }
 }
@@ -75,23 +104,14 @@ int8_t sx1262_test_spi(void) {
     uint8_t test_data[4] = {0x12, 0x34, 0x56, 0x78};
     uint8_t read_data[4];
     
-    sx1262_debug_print("Testing SPI communication...\r\n");
-    
     // Test basic SPI write/read
-    if (sx1262_spi_write(0x00, test_data, 4) == 0) {
-        sx1262_debug_print("✓ SPI write test passed\r\n");
-    } else {
-        sx1262_debug_print("✗ SPI write test failed\r\n");
-        return -1;
+    if (sx1262_spi_write(SX1262_CMD_WRITE_BUFFER, test_data, 4) == 0) {
+        if (sx1262_spi_read(SX1262_CMD_READ_BUFFER, read_data, 4) == 0) {
+            return 0;
+        }
     }
     
-    if (sx1262_spi_read(0x00, read_data, 4) == 0) {
-        sx1262_debug_print("✓ SPI read test passed\r\n");
-        return 0;
-    } else {
-        sx1262_debug_print("✗ SPI read test failed\r\n");
-        return -1;
-    }
+    return -1;
 }
 
 // SPI read function for SX1262
@@ -101,12 +121,11 @@ int8_t sx1262_spi_read(uint8_t address, uint8_t* data, uint8_t length) {
     
     if (length > 255) return -1;
     
-    // Prepare command - SX1262 uses 8-bit addresses
-    tx_buffer[0] = address; // Direct address for SX1262
+    // Prepare command - SX1262 uses command codes
+    tx_buffer[0] = address;
     
     // Wait for BUSY to go low
     if (!sx1262_wait_for_busy()) {
-        sx1262_debug_print("BUSY timeout during SPI read\r\n");
         return -1;
     }
     
@@ -117,14 +136,12 @@ int8_t sx1262_spi_read(uint8_t address, uint8_t* data, uint8_t length) {
     // Transmit command
     if (HAL_SPI_Transmit(sx1262_ctx.spi, tx_buffer, 1, 1000) != HAL_OK) {
         HAL_GPIO_WritePin(sx1262_ctx.nss_port, sx1262_ctx.nss_pin, GPIO_PIN_SET);
-        sx1262_debug_print("SPI transmit failed\r\n");
         return -1;
     }
     
     // Receive data
     if (HAL_SPI_Receive(sx1262_ctx.spi, rx_buffer, length, 1000) != HAL_OK) {
         HAL_GPIO_WritePin(sx1262_ctx.nss_port, sx1262_ctx.nss_pin, GPIO_PIN_SET);
-        sx1262_debug_print("SPI receive failed\r\n");
         return -1;
     }
     
@@ -143,13 +160,12 @@ int8_t sx1262_spi_write(uint8_t address, const uint8_t* data, uint8_t length) {
     
     if (length > 255) return -1;
     
-    // Prepare command and data - SX1262 uses 8-bit addresses
-    tx_buffer[0] = address; // Direct address for SX1262
+    // Prepare command and data - SX1262 uses command codes
+    tx_buffer[0] = address;
     memcpy(&tx_buffer[1], data, length);
     
     // Wait for BUSY to go low
     if (!sx1262_wait_for_busy()) {
-        sx1262_debug_print("BUSY timeout during SPI write\r\n");
         return -1;
     }
     
@@ -160,7 +176,6 @@ int8_t sx1262_spi_write(uint8_t address, const uint8_t* data, uint8_t length) {
     // Transmit command and data
     if (HAL_SPI_Transmit(sx1262_ctx.spi, tx_buffer, length + 1, 1000) != HAL_OK) {
         HAL_GPIO_WritePin(sx1262_ctx.nss_port, sx1262_ctx.nss_pin, GPIO_PIN_SET);
-        sx1262_debug_print("SPI transmit failed\r\n");
         return -1;
     }
     
@@ -206,8 +221,6 @@ int8_t sx1262_spi_write_read(uint8_t address, const uint8_t* tx_data, uint8_t* r
 
 // Reset SX1262 module
 int8_t sx1262_reset(void) {
-    sx1262_debug_print("Resetting SX1262 module...\r\n");
-    
     // Pull RESET low
     HAL_GPIO_WritePin(sx1262_ctx.reset_port, sx1262_ctx.reset_pin, GPIO_PIN_RESET);
     HAL_Delay(20); // Longer reset pulse
@@ -218,162 +231,138 @@ int8_t sx1262_reset(void) {
     
     // Check if BUSY is high initially (normal after reset)
     if (HAL_GPIO_ReadPin(sx1262_ctx.busy_port, sx1262_ctx.busy_pin) == GPIO_PIN_SET) {
-        sx1262_debug_print("BUSY is high after reset (normal)\r\n");
         HAL_Delay(100); // Wait for module to finish initialization
     }
     
     // Now wait for BUSY to go low (module ready)
     if (!sx1262_wait_for_busy()) {
-        sx1262_debug_print("✗ SX1262 reset failed - BUSY timeout\r\n");
         return -1;
     }
     
-    sx1262_debug_print("✓ SX1262 reset successful\r\n");
     return 0;
 }
 
-// Configure SX1262 for LoRa operation
+// Configure SX1262 for LoRa operation following datasheet sequence
 int8_t sx1262_configure_lora(void) {
     uint8_t config_data[16];
     
-    // Set to standby mode
-    config_data[0] = 0x80; // STANDBY_RC command
-    if (sx1262_spi_write(0x80, config_data, 1) != 0) {
-        sx1262_debug_print("✗ Failed to set standby mode\r\n");
+    // Step 1: Set to standby mode
+    config_data[0] = 0x00; // STANDBY_RC mode
+    if (sx1262_spi_write(SX1262_CMD_SET_STANDBY, config_data, 1) != 0) {
         return -1;
     }
     
-    // Set regulator mode to LDO
-    config_data[0] = 0x96; // SET_REGULATOR_MODE command
-    config_data[1] = 0x00; // LDO mode
-    if (sx1262_spi_write(0x96, config_data, 2) != 0) {
-        sx1262_debug_print("✗ Failed to set regulator mode\r\n");
+    // Step 2: Set regulator mode to LDO
+    config_data[0] = 0x00; // LDO mode
+    if (sx1262_spi_write(SX1262_CMD_SET_REGULATOR_MODE, config_data, 1) != 0) {
         return -1;
     }
     
-    // Set packet type to LoRa
-    config_data[0] = 0x8A; // SET_PKT_TYPE command
-    config_data[1] = 0x01; // LoRa packet type
-    if (sx1262_spi_write(0x8A, config_data, 2) != 0) {
-        sx1262_debug_print("✗ Failed to set packet type\r\n");
+    // Step 3: Set packet type to LoRa
+    config_data[0] = 0x01; // LoRa packet type
+    if (sx1262_spi_write(SX1262_CMD_SET_PKT_TYPE, config_data, 1) != 0) {
         return -1;
     }
     
-    // Set RF frequency (868 MHz)
-    uint32_t freq = ((uint64_t)SX1262_FREQUENCY_HZ * 16384) / 32000000; // Convert to SX1262 format
-    config_data[0] = 0x86; // SET_RF_FREQUENCY command
-    config_data[1] = (freq >> 16) & 0xFF;
-    config_data[2] = (freq >> 8) & 0xFF;
-    config_data[3] = freq & 0xFF;
-    if (sx1262_spi_write(0x86, config_data, 4) != 0) {
-        sx1262_debug_print("✗ Failed to set RF frequency\r\n");
+    // Step 4: Set RF frequency (868 MHz)
+    // Frequency calculation: Freq = (Freq_Hz * 2^25) / 32MHz
+    uint32_t freq = ((uint64_t)SX1262_FREQUENCY_HZ * 33554432) / 32000000;
+    config_data[0] = (freq >> 16) & 0xFF;
+    config_data[1] = (freq >> 8) & 0xFF;
+    config_data[2] = freq & 0xFF;
+    if (sx1262_spi_write(SX1262_CMD_SET_RF_FREQUENCY, config_data, 3) != 0) {
         return -1;
     }
     
-    // Set LoRa modulation parameters
-    config_data[0] = 0x8B; // SET_MODULATION_PARAMS command
-    config_data[1] = SX1262_SPREADING_FACTOR; // Spreading factor
-    config_data[2] = SX1262_BANDWIDTH / 125; // Bandwidth (125 kHz = 0x00)
-    config_data[3] = SX1262_CODING_RATE; // Coding rate
-    config_data[4] = 0x01; // Low data rate optimization
-    if (sx1262_spi_write(0x8B, config_data, 5) != 0) {
-        sx1262_debug_print("✗ Failed to set modulation parameters\r\n");
+    // Step 5: Set LoRa modulation parameters
+    config_data[0] = SX1262_SPREADING_FACTOR; // Spreading factor (SF7)
+    config_data[1] = 0x00; // Bandwidth 125 kHz (0x00 = 125kHz)
+    config_data[2] = SX1262_CODING_RATE; // Coding rate (4/5)
+    config_data[3] = 0x01; // Low data rate optimization enabled
+    if (sx1262_spi_write(SX1262_CMD_SET_MODULATION_PARAMS, config_data, 4) != 0) {
         return -1;
     }
     
-    // Set LoRa packet parameters
-    config_data[0] = 0x8C; // SET_PKT_PARAMS command
-    config_data[1] = SX1262_PREAMBLE_LENGTH >> 8; // Preamble length MSB
-    config_data[2] = SX1262_PREAMBLE_LENGTH & 0xFF; // Preamble length LSB
-    config_data[3] = 0x01; // Header type (explicit)
-    config_data[4] = SX1262_PAYLOAD_LENGTH; // Payload length
-    config_data[5] = 0x01; // CRC on
-    config_data[6] = 0x00; // Invert IQ off
-    if (sx1262_spi_write(0x8C, config_data, 7) != 0) {
-        sx1262_debug_print("✗ Failed to set packet parameters\r\n");
+    // Step 6: Set LoRa packet parameters
+    config_data[0] = (SX1262_PREAMBLE_LENGTH >> 8) & 0xFF; // Preamble length MSB
+    config_data[1] = SX1262_PREAMBLE_LENGTH & 0xFF; // Preamble length LSB
+    config_data[2] = 0x01; // Header type (explicit)
+    config_data[3] = SX1262_PAYLOAD_LENGTH; // Payload length
+    config_data[4] = 0x01; // CRC on
+    config_data[5] = 0x00; // Invert IQ off
+    if (sx1262_spi_write(SX1262_CMD_SET_PKT_PARAMS, config_data, 6) != 0) {
         return -1;
     }
     
-    // Set TX parameters
-    config_data[0] = 0x8E; // SET_TX_PARAMS command
-    config_data[1] = SX1262_TX_POWER_DBM; // TX power
-    config_data[2] = 0x00; // Ramp time (10 us)
-    if (sx1262_spi_write(0x8E, config_data, 3) != 0) {
-        sx1262_debug_print("✗ Failed to set TX parameters\r\n");
+    // Step 7: Set TX parameters
+    config_data[0] = SX1262_TX_POWER_DBM; // TX power in dBm
+    config_data[1] = 0x00; // Ramp time (10 us)
+    if (sx1262_spi_write(SX1262_CMD_SET_TX_PARAMS, config_data, 2) != 0) {
         return -1;
     }
     
-    // Set LoRa sync word
-    config_data[0] = 0x91; // SET_LORA_SYNC_WORD command
-    config_data[1] = SX1262_SYNC_WORD; // Sync word
-    if (sx1262_spi_write(0x91, config_data, 2) != 0) {
-        sx1262_debug_print("✗ Failed to set sync word\r\n");
+    // Step 8: Set buffer base address
+    config_data[0] = 0x00; // TX base address
+    config_data[1] = 0x00; // RX base address
+    if (sx1262_spi_write(SX1262_CMD_SET_BUFFER_BASE_ADDRESS, config_data, 2) != 0) {
         return -1;
     }
     
-    // Set buffer base address
-    config_data[0] = 0x8F; // SET_BUFFER_BASE_ADDRESS command
-    config_data[1] = 0x00; // TX base address
-    config_data[2] = 0x00; // RX base address
-    if (sx1262_spi_write(0x8F, config_data, 3) != 0) {
-        sx1262_debug_print("✗ Failed to set buffer base address\r\n");
+    // Step 9: Set LoRa sync word
+    config_data[0] = SX1262_SYNC_WORD; // Sync word
+    if (sx1262_spi_write(SX1262_CMD_SET_LORA_SYNC_WORD, config_data, 1) != 0) {
         return -1;
     }
     
-    sx1262_debug_print("✓ SX1262 LoRa configuration successful\r\n");
+    // Step 10: Configure DIO1 for TX_DONE interrupt
+    config_data[0] = 0x01; // IRQ_TX_DONE
+    config_data[1] = 0x00; // IRQ_RX_DONE
+    config_data[2] = 0x00; // IRQ_PREAMBLE_DETECTED
+    config_data[3] = 0x00; // IRQ_SYNC_WORD_VALID
+    config_data[4] = 0x00; // IRQ_HEADER_VALID
+    config_data[5] = 0x00; // IRQ_HEADER_ERR
+    config_data[6] = 0x00; // IRQ_CRC_ERR
+    config_data[7] = 0x00; // IRQ_CAD_DONE
+    config_data[8] = 0x00; // IRQ_CAD_DETECTED
+    config_data[9] = 0x00; // IRQ_TIMEOUT
+    if (sx1262_spi_write(SX1262_CMD_SET_DIO_IRQ_PARAMS, config_data, 10) != 0) {
+        return -1;
+    }
+    
     return 0;
 }
 
 // Initialize SX1262 module
 int8_t sx1262_init(void) {
-    sx1262_debug_print("Initializing SX1262 LoRa module...\r\n");
-    
     // First detect if module is present
     if (sx1262_detect_module() != 0) {
-        sx1262_debug_print("✗ SX1262 module not detected - check connections\r\n");
-        sx1262_debug_print("Check wiring:\r\n");
-        sx1262_debug_print("  - PA4 (NSS) → SX1262 CS\r\n");
-        sx1262_debug_print("  - PA5 (SCK) → SX1262 SCK\r\n");
-        sx1262_debug_print("  - PA6 (MISO) → SX1262 MISO\r\n");
-        sx1262_debug_print("  - PA7 (MOSI) → SX1262 MOSI\r\n");
-        sx1262_debug_print("  - PC0 (RESET) → SX1262 RESET\r\n");
-        sx1262_debug_print("  - PC1 (BUSY) → SX1262 BUSY\r\n");
-        sx1262_debug_print("  - 3.3V → SX1262 VCC\r\n");
-        sx1262_debug_print("  - GND → SX1262 GND\r\n");
         sx1262_module_detected = 0;
         sx1262_initialized = 0;
         return -1;
     }
     
     sx1262_module_detected = 1;
-    sx1262_debug_print("✓ Module detected, proceeding with initialization...\r\n");
     
     // Reset the module
     if (sx1262_reset() != 0) {
-        sx1262_debug_print("✗ SX1262 reset failed - trying alternative approach\r\n");
-        
         // Try a simpler approach - just wait and try to configure
         HAL_Delay(200); // Wait longer for module to stabilize
         
         if (sx1262_configure_lora() != 0) {
-            sx1262_debug_print("✗ SX1262 LoRa configuration failed after reset timeout\r\n");
             sx1262_initialized = 0;
             return -1;
         }
         
-        sx1262_debug_print("✓ SX1262 LoRa module initialized (alternative method)\r\n");
         sx1262_initialized = 1;
         return 0;
     }
     
     // Configure for LoRa operation
     if (sx1262_configure_lora() != 0) {
-        sx1262_debug_print("✗ SX1262 LoRa configuration failed\r\n");
         sx1262_initialized = 0;
         return -1;
     }
     
-    sx1262_debug_print("✓ SX1262 LoRa module initialized successfully\r\n");
     sx1262_initialized = 1;
     return 0;
 }
@@ -381,12 +370,10 @@ int8_t sx1262_init(void) {
 // Send sensor data via SX1262 LoRa
 int8_t sx1262_send_sensor_data(float temperature, float pressure, float humidity) {
     if (!sx1262_module_detected) {
-        sx1262_debug_print("✗ LoRa transmission failed - no module detected\r\n");
         return -1;
     }
     
     if (!sx1262_initialized) {
-        sx1262_debug_print("✗ LoRa transmission failed - module not initialized\r\n");
         return -1;
     }
     
@@ -400,50 +387,66 @@ int8_t sx1262_send_sensor_data(float temperature, float pressure, float humidity
     return sx1262_send_message((uint8_t*)payload, strlen(payload));
 }
 
-// Send message via SX1262 LoRa
+// Send message via SX1262 LoRa following datasheet TX sequence
 int8_t sx1262_send_message(const uint8_t* data, uint8_t length) {
     if (!sx1262_module_detected) {
-        sx1262_debug_print("✗ LoRa transmission failed - no module detected\r\n");
         return -1;
     }
     
     if (!sx1262_initialized) {
-        sx1262_debug_print("✗ LoRa transmission failed - module not initialized\r\n");
         return -1;
     }
     
     if (data == NULL || length == 0 || length > SX1262_PAYLOAD_LENGTH) {
-        sx1262_debug_print("Invalid LoRa message parameters\r\n");
         return -1;
     }
     
-    // Write payload to buffer
-    if (sx1262_spi_write(0x0E, data, length) != 0) {
-        sx1262_debug_print("✗ Failed to write payload to buffer\r\n");
+    // Step 1: Set to standby mode
+    uint8_t standby_cmd = 0x00; // STANDBY_RC mode
+    if (sx1262_spi_write(SX1262_CMD_SET_STANDBY, &standby_cmd, 1) != 0) {
         return -1;
     }
     
-    // Set packet length
-    uint8_t pkt_len = length;
-    if (sx1262_spi_write(0x8C, &pkt_len, 1) != 0) {
-        sx1262_debug_print("✗ Failed to set packet length\r\n");
+    // Step 2: Write payload to buffer
+    if (sx1262_spi_write(SX1262_CMD_WRITE_BUFFER, data, length) != 0) {
         return -1;
     }
     
-    // Start transmission
-    uint8_t tx_cmd = 0x83; // TX command
-    if (sx1262_spi_write(0x83, &tx_cmd, 1) != 0) {
-        sx1262_debug_print("✗ Failed to start transmission\r\n");
+    // Step 3: Set packet length (update packet parameters)
+    uint8_t pkt_params[6];
+    pkt_params[0] = (SX1262_PREAMBLE_LENGTH >> 8) & 0xFF; // Preamble length MSB
+    pkt_params[1] = SX1262_PREAMBLE_LENGTH & 0xFF; // Preamble length LSB
+    pkt_params[2] = 0x01; // Header type (explicit)
+    pkt_params[3] = length; // Payload length (dynamic)
+    pkt_params[4] = 0x01; // CRC on
+    pkt_params[5] = 0x00; // Invert IQ off
+    if (sx1262_spi_write(SX1262_CMD_SET_PKT_PARAMS, pkt_params, 6) != 0) {
         return -1;
     }
     
-    // Wait for transmission to complete (BUSY will go low)
-    if (!sx1262_wait_for_busy()) {
-        sx1262_debug_print("✗ LoRa transmission timeout\r\n");
-                return -1;
+    // Step 4: Start transmission with timeout
+    uint8_t tx_cmd = 0x00; // TX command with timeout
+    uint8_t timeout_ms = 1000; // 1 second timeout
+    uint8_t tx_params[2] = {tx_cmd, timeout_ms};
+    if (sx1262_spi_write(SX1262_CMD_SET_TX, tx_params, 2) != 0) {
+        return -1;
     }
     
-    sx1262_debug_print("✓ Message sent successfully via SX1262 LoRa\r\n");
+    // Step 5: Wait for transmission to complete (BUSY will go low)
+    uint32_t tx_start = HAL_GetTick();
+    uint32_t tx_timeout = tx_start + 2000; // 2 second timeout
+    
+    while (HAL_GPIO_ReadPin(sx1262_ctx.busy_port, sx1262_ctx.busy_pin) == GPIO_PIN_SET) {
+        if (HAL_GetTick() > tx_timeout) {
+            return -1;
+        }
+        HAL_Delay(1);
+    }
+    
+    // Step 6: Check packet status (optional)
+    uint8_t pkt_status;
+    sx1262_spi_read(SX1262_CMD_GET_PKT_STATUS, &pkt_status, 1);
+    
     return 0;
 }
 
@@ -457,47 +460,25 @@ void sx1262_process_irq(void) {
 int8_t sx1262_get_status(void) {
     uint8_t status;
     
-    if (sx1262_spi_read(0xC0, &status, 1) == 0) {
-        char status_msg[64];
-        snprintf(status_msg, sizeof(status_msg), "SX1262 Status: 0x%02X\r\n", status);
-        sx1262_debug_print(status_msg);
+    if (sx1262_spi_read(SX1262_CMD_GET_STATUS, &status, 1) == 0) {
         return 0;
     }
     
-        return -1;
-    }
-    
+    return -1;
+}
+
 // Print SX1262 configuration
 void sx1262_print_config(void) {
-    sx1262_debug_print("\r\n=== SX1262 LoRa Configuration ===\r\n");
-    sx1262_debug_print("Status: ");
-    sx1262_debug_print(sx1262_module_detected ? "Module detected\r\n" : "No module detected\r\n");
-    sx1262_debug_print("Initialized: ");
-    sx1262_debug_print(sx1262_initialized ? "Yes\r\n" : "No\r\n");
-    sx1262_debug_print("Frequency: 868 MHz (EU band)\r\n");
-    sx1262_debug_print("Spreading Factor: SF7\r\n");
-    sx1262_debug_print("Bandwidth: 125 kHz\r\n");
-    sx1262_debug_print("Coding Rate: 4/5\r\n");
-    sx1262_debug_print("TX Power: 14 dBm\r\n");
-    sx1262_debug_print("Sync Word: 0x12\r\n");
-    sx1262_debug_print("Payload Length: 64 bytes\r\n");
-    sx1262_debug_print("Preamble Length: 8 symbols\r\n");
-    sx1262_debug_print("CRC: Enabled\r\n");
-    sx1262_debug_print("IQ Inversion: Disabled\r\n");
-    sx1262_debug_print("========================\r\n");
+    // Configuration is handled by command interface
 }
 
 // Test SX1262 transmission
 int8_t sx1262_test_transmission(void) {
     const char* test_message = "Hello SX1262 from STM32!";
     
-    sx1262_debug_print("Testing SX1262 LoRa transmission...\r\n");
-    
     if (sx1262_send_message((uint8_t*)test_message, strlen(test_message)) == 0) {
-        sx1262_debug_print("✓ SX1262 transmission test successful\r\n");
         return 0;
     } else {
-        sx1262_debug_print("✗ SX1262 transmission test failed\r\n");
         return -1;
     }
 }
@@ -506,24 +487,20 @@ int8_t sx1262_test_transmission(void) {
 
 // Scan for LoRa signals (placeholder implementation)
 int8_t lora_scan_signals(uint32_t scan_time_ms) {
-    sx1262_debug_print("LoRa signal scanning not implemented yet\r\n");
-        return -1;
-    }
-    
+    return -1;
+}
+
 // Start LoRa monitoring (placeholder implementation)
 int8_t lora_start_monitoring(void) {
-    sx1262_debug_print("LoRa monitoring not implemented yet\r\n");
-        return -1;
-    }
-    
+    return -1;
+}
+
 // Stop LoRa monitoring (placeholder implementation)
 int8_t lora_stop_monitoring(void) {
-    sx1262_debug_print("LoRa monitoring not implemented yet\r\n");
-        return -1;
-    }
-    
+    return -1;
+}
+
 // Get RSSI value (placeholder implementation)
 int8_t lora_get_rssi(void) {
-    sx1262_debug_print("RSSI measurement not implemented yet\r\n");
-        return -1;
+    return -1;
 } 

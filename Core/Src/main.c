@@ -48,7 +48,7 @@ I2C_HandleTypeDef hi2c1;
 SPI_HandleTypeDef hspi1;
 
 UART_HandleTypeDef huart2;
-UART_HandleTypeDef huart4;
+UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
 
@@ -59,8 +59,8 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
-static void MX_USART4_UART_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_USART3_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -101,70 +101,78 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_I2C1_Init();
-  MX_USART4_UART_Init();
   MX_SPI1_Init();
-  
-  // Small delay to ensure I2C bus is stable
-  HAL_Delay(100);
-  
+  MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
+  // Simple USART test - send a basic message
+  HAL_UART_Transmit(&huart2, (uint8_t*)"USART2 Test - System Starting...\r\n", 32, 1000);
+  HAL_UART_Transmit(&huart3, (uint8_t*)"USART3 Test - System Starting...\r\n", 32, 1000);
+  
+  // Additional USART test - send multiple messages
+  for(int i = 0; i < 5; i++) {
+    HAL_UART_Transmit(&huart2, (uint8_t*)"USART2 Working!\r\n", 17, 1000);
+    HAL_UART_Transmit(&huart3, (uint8_t*)"USART3 Working!\r\n", 17, 1000);
+    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_1); // Toggle LED (using PC1 as LED) to show activity
+    HAL_Delay(500);
+  }
+  
+  // Send initialization messages to USART3
+  HAL_UART_Transmit(&huart3, (uint8_t*)"========================================\r\n", 40, 1000);
+  HAL_UART_Transmit(&huart3, (uint8_t*)"IoT System - Clean Interface (USART3)\r\n", 38, 1000);
+  HAL_UART_Transmit(&huart3, (uint8_t*)"========================================\r\n", 40, 1000);
+  HAL_UART_Transmit(&huart3, (uint8_t*)"Team Members:\r\n", 15, 1000);
+  HAL_UART_Transmit(&huart3, (uint8_t*)"- Azeem Sarwar\r\n", 17, 1000);
+  HAL_UART_Transmit(&huart3, (uint8_t*)"- Muhammad Waqas Khan\r\n", 23, 1000);
+  HAL_UART_Transmit(&huart3, (uint8_t*)"- Muhammad Nafis Sadiq\r\n", 24, 1000);
+  HAL_UART_Transmit(&huart3, (uint8_t*)"- Wasif Gul\r\n", 13, 1000);
+  HAL_UART_Transmit(&huart3, (uint8_t*)"- Ananya\r\n", 10, 1000);
+  HAL_UART_Transmit(&huart3, (uint8_t*)"========================================\r\n", 40, 1000);
+  HAL_UART_Transmit(&huart3, (uint8_t*)"System Clock: 16 MHz\r\n", 22, 1000);
+  HAL_UART_Transmit(&huart3, (uint8_t*)"USART3: PC10 (TX), PC11 (RX) - 115200 baud\r\n", 42, 1000);
+  HAL_UART_Transmit(&huart3, (uint8_t*)"Ready for commands...\r\n", 23, 1000);
+  HAL_UART_Transmit(&huart3, (uint8_t*)"========================================\r\n", 40, 1000);
+  
+  // Initialize command interface first
+  command_interface_init();
+  
   // System initialization messages
   command_interface_send_response("========================================\r\n");
   command_interface_send_response("IoT Prototype System - STM32G071RB\r\n");
   command_interface_send_response("========================================\r\n");
   command_interface_send_response("System Clock: 16 MHz\r\n");
   command_interface_send_response("I2C1 Configuration: PA9 (SCL), PA10 (SDA)\r\n");
-  command_interface_send_response("USART1: PC4 (TX), PC5 (RX) - 115200 baud\r\n");
   command_interface_send_response("USART2: PA2 (TX), PA3 (RX) - 115200 baud\r\n");
-  command_interface_send_response("USART4: PA0 (TX), PA1 (RX) - 115200 baud\r\n");
+  command_interface_send_response("USART3: PC10 (TX), PC11 (RX) - 115200 baud\r\n");
   command_interface_send_response("SPI1: PA5 (SCK), PA6 (MISO), PA7 (MOSI), PA4 (NSS)\r\n");
-  command_interface_send_response("SX1262 LoRa: PA4 (NSS), PC0 (RESET), PC1 (BUSY)\r\n");
-  command_interface_send_response("LED Status: PA5\r\n");
+  command_interface_send_response("SX1262 LoRa: PA4 (NSS), PC0 (RESET), PC3 (BUSY)\r\n");
+  command_interface_send_response("LED Status: PC1\r\n");
   command_interface_send_response("========================================\r\n");
   
-  command_interface_send_response_usart4("========================================\r\n");
-  command_interface_send_response_usart4("IoT Prototype System - STM32G071RB\r\n");
-  command_interface_send_response_usart4("========================================\r\n");
-  command_interface_send_response_usart4("System Clock: 16 MHz\r\n");
-  command_interface_send_response_usart4("I2C1 Configuration: PA9 (SCL), PA10 (SDA)\r\n");
-  command_interface_send_response_usart4("USART1: PC4 (TX), PC5 (RX) - 115200 baud\r\n");
-  command_interface_send_response_usart4("USART2: PA2 (TX), PA3 (RX) - 115200 baud\r\n");
-  command_interface_send_response_usart4("USART4: PA0 (TX), PA1 (RX) - 115200 baud\r\n");
-  command_interface_send_response_usart4("SPI1: PA5 (SCK), PA6 (MISO), PA7 (MOSI), PA4 (NSS)\r\n");
-  command_interface_send_response_usart4("SX1262 LoRa: PA4 (NSS), PC0 (RESET), PC1 (BUSY)\r\n");
-  command_interface_send_response_usart4("LED Status: PA5\r\n");
-  command_interface_send_response_usart4("========================================\r\n");
+  // USART3 is kept clean for command results only
   
-  // Scan I2C bus for devices
+  // Scan I2C bus for devices (debug only on USART2)
   command_interface_send_response("\r\nScanning I2C bus for devices...\r\n");
-  command_interface_send_response_usart4("\r\nScanning I2C bus for devices...\r\n");
   i2c_scan_bus();
   
-  // Test I2C configuration
+  // Test I2C configuration (debug only on USART2)
   command_interface_send_response("\r\nTesting I2C configuration...\r\n");
-  command_interface_send_response_usart4("\r\nTesting I2C configuration...\r\n");
   
   // Test I2C bus with a simple ping
   HAL_StatusTypeDef i2c_test = HAL_I2C_IsDeviceReady(&hi2c1, 0x76 << 1, 3, 1000);
   if (i2c_test == HAL_OK) {
     command_interface_send_response("✓ I2C bus test successful - device responds at 0x76\r\n");
-    command_interface_send_response_usart4("✓ I2C bus test successful - device responds at 0x76\r\n");
   } else {
     command_interface_send_response("✗ I2C bus test failed - no device at 0x76\r\n");
-    command_interface_send_response_usart4("✗ I2C bus test failed - no device at 0x76\r\n");
   }
   
-  // Check BME680 sensor presence
+  // Check BME680 sensor presence (debug only on USART2)
   command_interface_send_response("\r\nChecking BME680 sensor presence...\r\n");
-  command_interface_send_response_usart4("\r\nChecking BME680 sensor presence...\r\n");
   
   if (bme680_check_sensor_presence() == BME68X_OK) {
     command_interface_send_response("✓ BME680 sensor detected on I2C bus (Address: 0x76)\r\n");
-    command_interface_send_response_usart4("✓ BME680 sensor detected on I2C bus (Address: 0x76)\r\n");
     
     // Initialize BME680 sensor
     command_interface_send_response("Initializing BME680 sensor...\r\n");
-    command_interface_send_response_usart4("Initializing BME680 sensor...\r\n");
     
     if (bme680_init_sensor() == BME68X_OK) {
       command_interface_send_response("✓ BME680 sensor initialized successfully\r\n");
@@ -172,20 +180,10 @@ int main(void)
       command_interface_send_response("  - Pressure oversampling: 1x\r\n");
       command_interface_send_response("  - Humidity oversampling: 1x\r\n");
       command_interface_send_response("  - Gas sensor: Disabled\r\n");
-      
-      command_interface_send_response_usart4("✓ BME680 sensor initialized successfully\r\n");
-      command_interface_send_response_usart4("  - Temperature oversampling: 1x\r\n");
-      command_interface_send_response_usart4("  - Pressure oversampling: 1x\r\n");
-      command_interface_send_response_usart4("  - Humidity oversampling: 1x\r\n");
-      command_interface_send_response_usart4("  - Gas sensor: Disabled\r\n");
     } else {
       command_interface_send_response("✗ Error initializing BME680 sensor\r\n");
       command_interface_send_response("  - Check sensor power supply (3.3V)\r\n");
       command_interface_send_response("  - Verify I2C connections\r\n");
-      
-      command_interface_send_response_usart4("✗ Error initializing BME680 sensor\r\n");
-      command_interface_send_response_usart4("  - Check sensor power supply (3.3V)\r\n");
-      command_interface_send_response_usart4("  - Verify I2C connections\r\n");
     }
   } else {
     command_interface_send_response("✗ BME680 sensor not found on I2C bus\r\n");
@@ -199,34 +197,25 @@ int main(void)
     command_interface_send_response("  3. Check pull-up resistors (4.7kΩ recommended)\r\n");
     command_interface_send_response("  4. Verify I2C address (default: 0x76)\r\n");
     command_interface_send_response("System will continue without sensor functionality\r\n");
-    
-    command_interface_send_response_usart4("✗ BME680 sensor not found on I2C bus\r\n");
-    command_interface_send_response_usart4("Troubleshooting steps:\r\n");
-    command_interface_send_response_usart4("  1. Check I2C connections:\r\n");
-    command_interface_send_response_usart4("     - PA9 (SCL) → BME680 SCL\r\n");
-    command_interface_send_response_usart4("     - PA10 (SDA) → BME680 SDA\r\n");
-    command_interface_send_response_usart4("  2. Verify power supply:\r\n");
-    command_interface_send_response_usart4("     - BME680 VCC → 3.3V\r\n");
-    command_interface_send_response_usart4("     - BME680 GND → GND\r\n");
-    command_interface_send_response_usart4("  3. Check pull-up resistors (4.7kΩ recommended)\r\n");
-    command_interface_send_response_usart4("  4. Verify I2C address (default: 0x76)\r\n");
-    command_interface_send_response_usart4("System will continue without sensor functionality\r\n");
   }
   
-  // Initialize LoRa module
+  // Initialize LoRa module (debug only on USART2)
   command_interface_send_response("\r\nInitializing LoRa module...\r\n");
-  command_interface_send_response_usart4("\r\nInitializing LoRa module...\r\n");
   
   if (lora_init() == 0) {
     command_interface_send_response("✓ LoRa module initialized successfully\r\n");
-    command_interface_send_response_usart4("✓ LoRa module initialized successfully\r\n");
   } else {
     command_interface_send_response("✗ LoRa module initialization failed\r\n");
-    command_interface_send_response_usart4("✗ LoRa module initialization failed\r\n");
   }
   
-  // Initialize command interface
-  command_interface_init();
+  // Send final status to USART3
+  HAL_UART_Transmit(&huart3, (uint8_t*)"System initialization complete!\r\n", 30, 1000);
+  HAL_UART_Transmit(&huart3, (uint8_t*)"Type 'start' to begin using commands.\r\n", 36, 1000);
+  HAL_UART_Transmit(&huart3, (uint8_t*)"> ", 2, 1000);
+  
+  // Test dual communication
+  HAL_UART_Transmit(&huart2, (uint8_t*)"[USART2] Dual communication test - this should appear on both USARTs\r\n", 70, 1000);
+  HAL_UART_Transmit(&huart3, (uint8_t*)"[USART3] Dual communication test - this should appear on both USARTs\r\n", 70, 1000);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -240,7 +229,7 @@ int main(void)
     command_interface_process();
 
     // Toggle LED to show system is running
-    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+    HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_1);
     
     // Small delay
     HAL_Delay(10);
@@ -425,38 +414,38 @@ static void MX_USART2_UART_Init(void)
 }
 
 /**
-  * @brief USART4 Initialization Function
+  * @brief USART3 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_USART4_UART_Init(void)
+static void MX_USART3_UART_Init(void)
 {
 
-  /* USER CODE BEGIN USART4_Init 0 */
+  /* USER CODE BEGIN USART3_Init 0 */
 
-  /* USER CODE END USART4_Init 0 */
+  /* USER CODE END USART3_Init 0 */
 
-  /* USER CODE BEGIN USART4_Init 1 */
+  /* USER CODE BEGIN USART3_Init 1 */
 
-  /* USER CODE END USART4_Init 1 */
-  huart4.Instance = USART4;
-  huart4.Init.BaudRate = 115200;
-  huart4.Init.WordLength = UART_WORDLENGTH_8B;
-  huart4.Init.StopBits = UART_STOPBITS_1;
-  huart4.Init.Parity = UART_PARITY_NONE;
-  huart4.Init.Mode = UART_MODE_TX_RX;
-  huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart4.Init.OverSampling = UART_OVERSAMPLING_16;
-  huart4.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart4.Init.ClockPrescaler = UART_PRESCALER_DIV1;
-  huart4.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart4) != HAL_OK)
+  /* USER CODE END USART3_Init 1 */
+  huart3.Instance = USART3;
+  huart3.Init.BaudRate = 115200;
+  huart3.Init.WordLength = UART_WORDLENGTH_8B;
+  huart3.Init.StopBits = UART_STOPBITS_1;
+  huart3.Init.Parity = UART_PARITY_NONE;
+  huart3.Init.Mode = UART_MODE_TX_RX;
+  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart3.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart3.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart3.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart3) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN USART4_Init 2 */
+  /* USER CODE BEGIN USART3_Init 2 */
 
-  /* USER CODE END USART4_Init 2 */
+  /* USER CODE END USART3_Init 2 */
 
 }
 
@@ -487,14 +476,16 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PC1 */
-  GPIO_InitStruct.Pin = GPIO_PIN_1;
+  /*Configure GPIO pin : PC3 */
+  GPIO_InitStruct.Pin = GPIO_PIN_3;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
-  /* PC1 is configured for SX1262 BUSY pin input */
+  /* PC0 is configured for SX1262 RESET pin output */
+  /* PC3 is configured for SX1262 BUSY pin input */
+  /* USART2 and USART3 pins are configured in HAL_UART_MspInit() */
   /* USER CODE END MX_GPIO_Init_2 */
 }
 
