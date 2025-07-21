@@ -1,13 +1,13 @@
-# USART4 Wiring Guide & Troubleshooting
+# USART3 Wiring Guide & Troubleshooting
 
 ## Hardware Configuration
 
-### STM32G071RB USART4 Pin Assignment
+### STM32G071RB USART3 Pin Assignment
 ```
 STM32G071RB Pin    →    USB-to-UART Converter / PuTTY
 ─────────────────────────────────────────────────────
-PA0 (USART4_TX)   →    RX (Receive)
-PA1 (USART4_RX)   →    TX (Transmit)
+PC10 (USART3_TX)   →    RX (Receive)
+PC11 (USART3_RX)   →    TX (Transmit)
 GND               →    GND (Ground)
 ```
 
@@ -17,11 +17,11 @@ GND               →    GND (Ground)
 │                    STM32G071RB                              │
 │  ┌─────────────────────────────────────────────────────┐    │
 │  │                                                     │    │
-│  │  PA0 ──────────────────────────────────────────────┐ │    │
-│  │  (USART4_TX)                                      │ │    │
+│  │  PC10 ──────────────────────────────────────────────┐ │    │
+│  │  (USART3_TX)                                      │ │    │
 │  │                                                   │ │    │
-│  │  PA1 ─────────────────────────────────────────────┤ │    │
-│  │  (USART4_RX)                                     │ │    │
+│  │  PC11 ─────────────────────────────────────────────┤ │    │
+│  │  (USART3_RX)                                     │ │    │
 │  │                                                  │ │    │
 │  │  GND ─────────────────────────────────────────────┤ │    │
 │  └─────────────────────────────────────────────────────┘    │
@@ -54,16 +54,16 @@ GND               →    GND (Ground)
 - **Stop Bits:** 1
 - **Parity:** None
 - **Flow Control:** None
-- **Alternate Function:** GPIO_AF4_USART4
+- **Alternate Function:** GPIO_AF4_USART3
 
 ### GPIO Configuration (Correct)
-- **PA0:** USART4_TX (Alternate Function 4)
-- **PA1:** USART4_RX (Alternate Function 4)
+- **PC10:** USART3_TX (Alternate Function 4)
+- **PC11:** USART3_RX (Alternate Function 4)
 - **Configuration:** GPIO_MODE_AF_PP (Alternate Function Push-Pull)
 
 ## Troubleshooting Guide
 
-### Issue 1: No Communication on USART4
+### Issue 1: No Communication on USART3
 **Symptoms:**
 - No response in PuTTY
 - No data received
@@ -74,8 +74,8 @@ GND               →    GND (Ground)
 1. **Wiring Issues**
    - **Problem:** Incorrect TX/RX connection
    - **Solution:** 
-     - STM32 PA0 (TX) → USB Converter RX
-     - STM32 PA1 (RX) → USB Converter TX
+     - STM32 PC10 (TX) → USB Converter RX
+     - STM32 PC11 (RX) → USB Converter TX
      - **Remember:** TX from one device goes to RX of the other
 
 2. **USB-to-UART Converter Issues**
@@ -140,8 +140,8 @@ GND               →    GND (Ground)
 ### Step 1: Hardware Verification
 1. **Check Connections:**
    ```
-   STM32 PA0 (TX) → USB Converter RX
-   STM32 PA1 (RX) → USB Converter TX
+   STM32 PC10 (TX) → USB Converter RX
+   STM32 PC11 (RX) → USB Converter TX
    STM32 GND → USB Converter GND
    ```
 
@@ -210,9 +210,9 @@ When the system boots, you should see:
 IoT Prototype System - STM32G071RB
 ========================================
 System Clock: 16 MHz
-I2C1 Configuration: PA9 (SCL), PA10 (SDA)
+I2C1 Configuration: PA9 (SCL), PC110 (SDA)
 USART2: PA2 (TX), PA3 (RX) - 115200 baud
-USART4: PA0 (TX), PA1 (RX) - 115200 baud
+USART3: PC10 (TX), PC11 (RX) - 115200 baud
 SPI1: PA5 (SCK), PA6 (MISO), PA7 (MOSI)
 LoRa: PA4 (NSS), PC0 (RESET)
 LED Status: PA5
@@ -242,7 +242,7 @@ Available commands:
 
 ## Quick Fix Checklist
 
-- [ ] Check TX/RX connections (PA0→RX, PA1→TX)
+- [ ] Check TX/RX connections (PC10→RX, PC11→TX)
 - [ ] Verify USB converter is recognized in Device Manager
 - [ ] Install correct USB-to-UART driver
 - [ ] Set PuTTY to correct COM port and 115200 baud
@@ -265,6 +265,6 @@ Available commands:
 - **Data Format:** 8N1 (8 data bits, no parity, 1 stop bit)
 
 ### Using Multimeter
-- **Voltage Check:** Measure voltage on PA0 and PA1
+- **Voltage Check:** Measure voltage on PC10 and PC11
 - **Continuity Test:** Check wire connections
 - **Ground Check:** Verify GND connection 
