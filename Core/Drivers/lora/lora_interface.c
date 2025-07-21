@@ -1,5 +1,5 @@
-#include "lora_interface.h"
-#include "bme680_interface.h"
+#include "lora/lora_interface.h"
+#include "bme680/bme680_interface.h"
 #include <string.h>
 #include <stdio.h>
 

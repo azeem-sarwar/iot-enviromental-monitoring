@@ -1,4 +1,4 @@
-#include "usart2_test.h"
+#include "usart/usart2_test.h"
 #include "stm32g0xx_hal.h"
 #include <string.h>
 

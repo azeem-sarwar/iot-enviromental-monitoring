@@ -1,7 +1,7 @@
 #ifndef __BME680_INTERFACE_H__
 #define __BME680_INTERFACE_H__
 
-#include "bme68x.h"
+#include "bme680/bme68x.h"
 #include "stm32g0xx_hal.h"
 
 // BME680 device structure

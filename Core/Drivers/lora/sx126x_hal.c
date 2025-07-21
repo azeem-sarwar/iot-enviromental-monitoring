@@ -37,7 +37,7 @@
  * --- DEPENDENCIES ------------------------------------------------------------
  */
 
-#include "sx126x_hal.h"
+#include "lora/sx126x_hal.h"
 #include "stm32g0xx_hal.h"
 #include <string.h>
 

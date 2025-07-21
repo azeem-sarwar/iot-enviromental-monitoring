@@ -1,4 +1,4 @@
-#include "bme680_interface.h"
+#include "bme680/bme680_interface.h"
 #include "main.h"
 #include <stdio.h>
 #include <string.h>

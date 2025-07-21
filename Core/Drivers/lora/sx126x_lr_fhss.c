@@ -37,9 +37,9 @@
  * --- DEPENDENCIES ------------------------------------------------------------
  */
 
-#include "lr_fhss_mac.h"
-#include "sx126x_lr_fhss.h"
-#include "sx126x_hal.h"
+#include "lora/lr_fhss_mac.h"
+#include "lora/sx126x_lr_fhss.h"
+#include "lora/sx126x_hal.h"
 
 /*
  * -----------------------------------------------------------------------------

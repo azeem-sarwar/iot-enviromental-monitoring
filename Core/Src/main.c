@@ -21,9 +21,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "bme680_interface.h"
-#include "command_interface.h"
-#include "lora_interface.h"
+#include "bme680/bme680_interface.h"
+#include "usart/command_interface.h"
+#include "lora/lora_interface.h"
 
 /* USER CODE END Includes */
 

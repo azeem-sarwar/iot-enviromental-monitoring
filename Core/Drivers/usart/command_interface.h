@@ -2,7 +2,8 @@
 #define __COMMAND_INTERFACE_H__
 
 #include "stm32g0xx_hal.h"
-#include "bme68x.h"
+#include "bme680/bme680_interface.h"
+#include "lora/lora_interface.h"
 
 // Command buffer size
 #define CMD_BUFFER_SIZE 64

@@ -37,9 +37,9 @@
  * --- DEPENDENCIES ------------------------------------------------------------
  */
 #include <stddef.h>
-#include "sx126x.h"
-#include "sx126x_hal.h"
-#include "sx126x_regs.h"
+#include "lora/sx126x.h"
+#include "lora/sx126x_hal.h"
+#include "lora/sx126x_regs.h"
 
 /*
  * -----------------------------------------------------------------------------
