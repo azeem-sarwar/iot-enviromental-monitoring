@@ -10,7 +10,7 @@
 
 Example (cmd/tree style):
 ```
-final_embedded_project/
+iot-enviorment-monitoring/
 ├── Core/
 │   ├── Drivers/
 │   │   ├── bme680/
